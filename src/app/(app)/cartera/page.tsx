@@ -22,7 +22,7 @@ export default async function CarteraPage() {
   let totalInvested = 0
 
   try {
-    const result = await getPortfolioData()
+    const result = await getPortfolioData(supabase)
     assets = result.assets
     totalInvested = result.totalInvested
   } catch (err) {

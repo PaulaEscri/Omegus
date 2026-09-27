@@ -6,12 +6,15 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { format, subDays, subWeeks, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import {
   CalendarIcon,
   ChevronDown,
   Loader2,
   CheckCircle2,
   AlertCircle,
+  ArrowRightLeft,
+  Settings2,
 } from 'lucide-react'
 import { cn, CONCEPT_SUGGESTIONS } from '@/lib/utils'
 import {
@@ -21,6 +24,7 @@ import {
   type TransactionFormInput,
 } from '@/lib/validations/transaction.schema'
 import { createTransaction } from '@/lib/queries/transactions'
+import { excludeAccount, splitDestinationAccounts } from '@/lib/accounts'
 import { useCategories } from '@/hooks/useCategories'
 import { useAccounts } from '@/hooks/useAccounts'
 import { TypeSelector } from './TypeSelector'
@@ -29,12 +33,51 @@ import { AssetCombobox } from './AssetCombobox'
 import { Calendar } from '@/components/ui/calendar'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import type { TransactionType, Category } from '@/types/database'
+import type { TransactionType, Category, Account } from '@/types/database'
 
 // ── Tipos internos ───────────────────────────────────────────
 interface TransactionFormProps {
   userId: string
   onSuccess?: () => void
+}
+
+const CONCEPT_PLACEHOLDER: Record<TransactionType, string> = {
+  income: 'Ej: Nómina de septiembre',
+  expense: 'Ej: Compra semanal',
+  savings: 'Ej: Hucha vacaciones',
+}
+
+// ── Chip de selección de cuenta (origen / destino) ────────────
+function AccountChip({
+  account,
+  isSelected,
+  onSelect,
+  activeClass,
+}: {
+  account: Account
+  isSelected: boolean
+  onSelect: () => void
+  activeClass: string
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={isSelected}
+      onClick={onSelect}
+      className={cn(
+        'flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2',
+        'text-left text-sm font-medium transition-all duration-150 active:scale-95',
+        isSelected ? activeClass : 'border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:border-zinc-700'
+      )}
+    >
+      <span
+        className="w-2.5 h-2.5 rounded-full shrink-0"
+        style={{ backgroundColor: account.color }}
+        aria-hidden="true"
+      />
+      <span className="truncate">{account.name}</span>
+    </button>
+  )
 }
 
 // ── Componente ───────────────────────────────────────────────
@@ -51,6 +94,7 @@ export function TransactionForm({ userId, onSuccess }: TransactionFormProps) {
     handleSubmit,
     watch,
     setValue,
+    getValues,
     reset,
     formState: { errors },
   } = useForm<TransactionFormInput, unknown, TransactionSchema>({
@@ -69,11 +113,14 @@ export function TransactionForm({ userId, onSuccess }: TransactionFormProps) {
 
   const watchType = watch('type')
   const watchCategoryId = watch('category_id')
+  const watchSubcategoryId = watch('subcategory_id')
   const watchDate = watch('transaction_date')
+  const watchAccountId = watch('account_id')
+  const watchDestinationAccountId = watch('destination_account_id')
 
   // ── Datos remotos ───────────────────────────────────────────
   const { categories, isLoading: loadingCats } = useCategories(watchType)
-  const { accounts, brokerAccounts, liquidAccounts, isLoading: loadingAccounts } = useAccounts()
+  const { accounts, isLoading: loadingAccounts } = useAccounts()
 
   // Reset categoría al cambiar tipo
   useEffect(() => {
@@ -86,9 +133,37 @@ export function TransactionForm({ userId, onSuccess }: TransactionFormProps) {
     setValue('subcategory_id', '')
   }, [watchCategoryId, setValue])
 
+  // Cuenta destino: solo aplica a "savings". Al cambiar de tipo, se limpia si
+  // deja de ser válida (tipo distinto de savings, o coincide con el origen).
+  useEffect(() => {
+    if (watchType !== 'savings') {
+      setValue('destination_account_id', '')
+    } else if (getValues('account_id') === getValues('destination_account_id')) {
+      setValue('destination_account_id', '')
+    }
+  }, [watchType, setValue, getValues])
+
+  // Si la cuenta origen ya no está entre las cuentas activas, límpiala
+  useEffect(() => {
+    if (watchAccountId && !accounts.some((a) => a.id === watchAccountId)) {
+      setValue('account_id', '')
+    }
+  }, [accounts, watchAccountId, setValue])
+
   // Calcular subcategorías activas
   const activeCategory = categories.find((c) => c.id === watchCategoryId)
   const subcategories: Category[] = activeCategory?.subcategories ?? []
+  const activeSubcategory = subcategories.find((s) => s.id === watchSubcategoryId)
+
+  // Solo las categorías/subcategorías de inversión piden Activo/Ticker
+  const requiresAsset = watchType === 'savings' && (
+    (activeCategory?.is_investment ?? false) || (activeSubcategory?.is_investment ?? false)
+  )
+
+  // Sincroniza el campo de UI requires_asset (no se persiste, lo usa el refine de zod)
+  useEffect(() => {
+    setValue('requires_asset', requiresAsset)
+  }, [requiresAsset, setValue])
 
   // Sugerencias de concepto para la categoría activa
   const conceptSuggestions: string[] = (() => {
@@ -97,14 +172,31 @@ export function TransactionForm({ userId, onSuccess }: TransactionFormProps) {
     return CONCEPT_SUGGESTIONS[key] ?? []
   })()
 
+  // Cuenta origen: en savings excluye la cuenta destino elegida (nunca por tipo);
+  // en income/expense, todas las cuentas activas (los brokers también valen).
+  const originAccounts = watchType === 'savings'
+    ? excludeAccount(accounts, watchDestinationAccountId)
+    : accounts
+
+  // Cuenta destino (savings): todas las cuentas excepto la origen elegida,
+  // agrupadas con las de tipo bróker (inversión) primero
+  const { investment: destinationInvestment, other: destinationOther } =
+    splitDestinationAccounts(accounts, watchAccountId)
+
   // ── Submit ──────────────────────────────────────────────────
   const onSubmit: SubmitHandler<TransactionSchema> = async (data) => {
     setSubmitState('loading')
     setErrorMsg('')
 
+    // Ahorro sin ticker (categoría no-inversión) y sin concepto: usa el nombre
+    // de la subcategoría o categoría para que Cartera no agrupe filas vacías.
+    const concept = !data.concept?.trim() && data.type === 'savings'
+      ? (activeSubcategory?.name ?? activeCategory?.name ?? data.concept)
+      : data.concept
+
     try {
       await createTransaction(
-        { ...data, amount: parseFloat(amountStr || '0') },
+        { ...data, concept, amount: parseFloat(amountStr || '0') },
         userId
       )
       setSubmitState('success')
@@ -419,10 +511,10 @@ export function TransactionForm({ userId, onSuccess }: TransactionFormProps) {
       <section aria-labelledby="section-concept">
         <label
           id="section-concept"
-          htmlFor={watchType === 'savings' ? 'concept-asset-input' : 'concept-input'}
+          htmlFor={requiresAsset ? 'concept-asset-input' : 'concept-input'}
           className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2"
         >
-          {watchType === 'savings' ? '📈 Activo / Ticker' : 'Concepto (Opcional)'}
+          {requiresAsset ? '📈 Activo / Ticker' : 'Concepto (Opcional)'}
         </label>
 
         <Controller
@@ -430,7 +522,7 @@ export function TransactionForm({ userId, onSuccess }: TransactionFormProps) {
           control={control}
           render={({ field }) => (
             <div>
-              {watchType === 'savings' ? (
+              {requiresAsset ? (
                 /* ── Combobox libre para activos de inversión ─────────── */
                 <AssetCombobox
                   value={field.value || ''}
@@ -438,13 +530,13 @@ export function TransactionForm({ userId, onSuccess }: TransactionFormProps) {
                   error={errors.concept?.message}
                 />
               ) : (
-                /* ── Input normal para ingresos y gastos ──────────────── */
+                /* ── Input normal para ingresos, gastos y ahorro no-inversión ─ */
                 <>
                   <input
                     {...field}
                     id="concept-input"
                     type="text"
-                    placeholder="Ej: Compra semanal (Opcional)"
+                    placeholder={CONCEPT_PLACEHOLDER[watchType as TransactionType]}
                     autoComplete="off"
                     aria-invalid={!!errors.concept}
                     aria-describedby={errors.concept ? 'concept-error' : undefined}
@@ -517,27 +609,19 @@ export function TransactionForm({ userId, onSuccess }: TransactionFormProps) {
                   aria-label="Seleccionar cuenta"
                   className="grid grid-cols-2 gap-2"
                 >
-                  {(watchType === 'savings' ? liquidAccounts : accounts).map((acc) => (
-                    <button
+                  {originAccounts.map((acc) => (
+                    <AccountChip
                       key={acc.id}
-                      type="button"
-                      aria-pressed={field.value === acc.id}
-                      onClick={() => field.onChange(acc.id)}
-                      className={cn(
-                        'flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2',
-                        'text-left text-sm font-medium transition-all duration-150 active:scale-95',
-                        field.value === acc.id
-                          ? 'border-violet-500 bg-violet-500/10 text-violet-300'
-                          : 'border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:border-zinc-700'
-                      )}
-                    >
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: acc.color }}
-                        aria-hidden="true"
-                      />
-                      <span className="truncate">{acc.name}</span>
-                    </button>
+                      account={acc}
+                      isSelected={field.value === acc.id}
+                      onSelect={() => {
+                        field.onChange(acc.id)
+                        if (watchDestinationAccountId === acc.id) {
+                          setValue('destination_account_id', '')
+                        }
+                      }}
+                      activeClass="border-violet-500 bg-violet-500/10 text-violet-300"
+                    />
                   ))}
                 </div>
                 {errors.account_id && (
@@ -549,59 +633,97 @@ export function TransactionForm({ userId, onSuccess }: TransactionFormProps) {
             )}
           />
         )}
+      </section>
 
-        {/* Cuenta destino (solo savings) */}
-        {watchType === 'savings' && (
-          <div className="mt-3">
-            <label className="block text-xs font-medium text-zinc-600 mb-2">
-              Cuenta destino (broker / inversión)
+      {/* ── 6b. CUENTA DESTINO (solo Ahorro / Inversión) ─────── */}
+      {watchType === 'savings' && (
+        <section
+          aria-labelledby="section-destination-account"
+          className="rounded-2xl border-2 border-blue-500/30 bg-blue-500/5 p-4"
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <ArrowRightLeft size={14} className="text-blue-400 shrink-0" />
+            <label
+              id="section-destination-account"
+              className="text-xs font-semibold text-blue-300 uppercase tracking-wider"
+            >
+              Cuenta destino
             </label>
-            <Controller
-              name="destination_account_id"
-              control={control}
-              render={({ field }) => (
-                <div>
-                  <div role="group" aria-label="Cuenta destino" className="grid grid-cols-2 gap-2">
-                    {brokerAccounts.length > 0 ? (
-                      brokerAccounts.map((acc) => (
-                        <button
-                          key={acc.id}
-                          type="button"
-                          aria-pressed={field.value === acc.id}
-                          onClick={() => field.onChange(acc.id)}
-                          className={cn(
-                            'flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2',
-                            'text-left text-sm font-medium transition-all duration-150 active:scale-95',
-                            field.value === acc.id
-                              ? 'border-blue-500 bg-blue-500/10 text-blue-300'
-                              : 'border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:border-zinc-700'
-                          )}
-                        >
-                          <span
-                            className="w-2.5 h-2.5 rounded-full shrink-0"
-                            style={{ backgroundColor: acc.color }}
-                            aria-hidden="true"
-                          />
-                          <span className="truncate">{acc.name}</span>
-                        </button>
-                      ))
-                    ) : (
-                      <p className="col-span-2 text-xs text-zinc-600 italic px-1">
-                        No hay cuentas de tipo broker. Añade una en Configuración.
-                      </p>
+            <span className="text-[10px] font-bold text-blue-400/80">· Obligatorio</span>
+          </div>
+          <p className="text-xs text-zinc-500 mb-3">
+            Este importe se mueve internamente entre tus cuentas — no se contabiliza como gasto.
+          </p>
+
+          <Controller
+            name="destination_account_id"
+            control={control}
+            render={({ field }) => (
+              <div>
+                {destinationInvestment.length > 0 || destinationOther.length > 0 ? (
+                  <div className="space-y-3">
+                    {destinationInvestment.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-bold text-blue-400/70 uppercase tracking-wider mb-1.5 px-1">
+                          Inversión
+                        </p>
+                        <div role="group" aria-label="Cuentas de inversión" className="grid grid-cols-2 gap-2">
+                          {destinationInvestment.map((acc) => (
+                            <AccountChip
+                              key={acc.id}
+                              account={acc}
+                              isSelected={field.value === acc.id}
+                              onSelect={() => field.onChange(acc.id)}
+                              activeClass="border-blue-500 bg-blue-500/10 text-blue-300"
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {destinationOther.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider mb-1.5 px-1">
+                          Otras cuentas
+                        </p>
+                        <div role="group" aria-label="Otras cuentas" className="grid grid-cols-2 gap-2">
+                          {destinationOther.map((acc) => (
+                            <AccountChip
+                              key={acc.id}
+                              account={acc}
+                              isSelected={field.value === acc.id}
+                              onSelect={() => field.onChange(acc.id)}
+                              activeClass="border-blue-500 bg-blue-500/10 text-blue-300"
+                            />
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
-                  {errors.destination_account_id && (
-                    <p role="alert" className="mt-1.5 text-xs text-red-400 px-1">
-                      {errors.destination_account_id.message}
+                ) : (
+                  <div className="flex flex-col items-start gap-2 px-1 py-1">
+                    <p className="text-xs text-zinc-500">
+                      No hay otras cuentas disponibles.
                     </p>
-                  )}
-                </div>
-              )}
-            />
-          </div>
-        )}
-      </section>
+                    <Link
+                      href="/ajustes"
+                      className="flex items-center gap-1.5 text-xs font-semibold text-blue-400 hover:text-blue-300 transition-colors"
+                    >
+                      <Settings2 size={13} />
+                      Añadir cuenta en Ajustes
+                    </Link>
+                  </div>
+                )}
+                {errors.destination_account_id && (
+                  <p role="alert" className="mt-2 text-xs text-red-400 px-1">
+                    {errors.destination_account_id.message}
+                  </p>
+                )}
+              </div>
+            )}
+          />
+        </section>
+      )}
 
       {/* ── 7. NOTAS ─────────────────────────────────────────── */}
       <section aria-labelledby="section-notes">

@@ -28,32 +28,33 @@ export async function injectDefinitiveStructure() {
     // ── 2. Categorías Padre ─────────────────────────────────────
     const rootCategories = [
       // Ingresos
-      { name: 'Nómina', type: 'income', color: '#10b981', icon: '💼', cashback: false },
-      { name: 'Attara Studio', type: 'income', color: '#8b5cf6', icon: '🎨', cashback: false },
-      { name: 'Cashback e Intereses', type: 'income', color: '#f59e0b', icon: '✨', cashback: true },
-      { name: 'Otros Ingresos', type: 'income', color: '#6b7280', icon: '➕', cashback: false },
-      
+      { name: 'Nómina', type: 'income', color: '#10b981', icon: '💼', cashback: false, investment: false },
+      { name: 'Attara Studio', type: 'income', color: '#8b5cf6', icon: '🎨', cashback: false, investment: false },
+      { name: 'Cashback e Intereses', type: 'income', color: '#f59e0b', icon: '✨', cashback: true, investment: false },
+      { name: 'Otros Ingresos', type: 'income', color: '#6b7280', icon: '➕', cashback: false, investment: false },
+
       // Ahorros
-      { name: 'Fondo de Seguridad', type: 'savings', color: '#3b82f6', icon: '🛡️', cashback: false },
-      { name: 'Acciones', type: 'savings', color: '#6366f1', icon: '📈', cashback: false },
-      { name: 'Bonos', type: 'savings', color: '#14b8a6', icon: '📜', cashback: false },
-      { name: 'Criptomonedas', type: 'savings', color: '#f59e0b', icon: '₿', cashback: false },
-      
+      { name: 'Fondo de Seguridad', type: 'savings', color: '#3b82f6', icon: '🛡️', cashback: false, investment: false },
+      { name: 'Acciones', type: 'savings', color: '#6366f1', icon: '📈', cashback: false, investment: true },
+      { name: 'Bonos', type: 'savings', color: '#14b8a6', icon: '📜', cashback: false, investment: true },
+      { name: 'Criptomonedas', type: 'savings', color: '#f59e0b', icon: '₿', cashback: false, investment: true },
+
       // Gastos
-      { name: 'Comida', type: 'expense', color: '#ef4444', icon: '🍽️', cashback: false },
-      { name: 'Transporte', type: 'expense', color: '#f97316', icon: '🚗', cashback: false },
-      { name: 'Suscripciones', type: 'expense', color: '#8b5cf6', icon: '📱', cashback: false },
-      { name: 'Ocio y Vida', type: 'expense', color: '#ec4899', icon: '🎉', cashback: false },
-      { name: 'Otros Gastos', type: 'expense', color: '#6b7280', icon: '➖', cashback: false },
+      { name: 'Comida', type: 'expense', color: '#ef4444', icon: '🍽️', cashback: false, investment: false },
+      { name: 'Transporte', type: 'expense', color: '#f97316', icon: '🚗', cashback: false, investment: false },
+      { name: 'Suscripciones', type: 'expense', color: '#8b5cf6', icon: '📱', cashback: false, investment: false },
+      { name: 'Ocio y Vida', type: 'expense', color: '#ec4899', icon: '🎉', cashback: false, investment: false },
+      { name: 'Otros Gastos', type: 'expense', color: '#6b7280', icon: '➖', cashback: false, investment: false },
     ]
 
     const createdRoots: Record<string, string> = {} // name -> id
-    
+    const investmentRootNames = new Set(rootCategories.filter((c) => c.investment).map((c) => c.name))
+
     let orderIndex = 1
     for (const cat of rootCategories) {
       const { data: existing } = await db.from('categories')
         .select('id').eq('user_id', user.id).eq('name', cat.name).eq('transaction_type', cat.type).is('parent_id', null).maybeSingle()
-      
+
       if (existing) {
         createdRoots[cat.name] = existing.id
       } else {
@@ -64,6 +65,7 @@ export async function injectDefinitiveStructure() {
           color: cat.color,
           icon: cat.icon,
           is_cashback: cat.cashback,
+          is_investment: cat.investment,
           sort_order: orderIndex++,
           is_active: true,
           parent_id: null
@@ -105,6 +107,7 @@ export async function injectDefinitiveStructure() {
           color: sub.color,
           icon: sub.icon,
           is_cashback: false,
+          is_investment: investmentRootNames.has(sub.parent),
           sort_order: orderIndex++,
           is_active: true,
           parent_id: parentId

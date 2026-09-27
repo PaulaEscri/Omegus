@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { Trash2, Plus, Loader2, ChevronDown, ChevronRight, AlertCircle, CheckCircle2, Edit3, CornerDownRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { actionAddCategory, actionDeleteCategory, actionUpdateCategory } from '@/app/(app)/ajustes/actions'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import type { Category, TransactionType } from '@/types/database'
 
 const COLOR_PALETTE = [
@@ -54,8 +55,7 @@ export function CategoryManager({ initialCategories, userId }: Props) {
   const [expanded, setExpanded] = useState<TransactionType | null>('expense')
   const [expandedRoots, setExpandedRoots] = useState<Record<string, boolean>>({})
 
-  const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<Category | null>(null)
 
   // Form State
   const [formState, setFormState] = useState<FormState | null>(null)
@@ -64,6 +64,7 @@ export function CategoryManager({ initialCategories, userId }: Props) {
   const [formColor, setFormColor] = useState(COLOR_PALETTE[0])
   const [formIcon, setFormIcon] = useState(ICON_OPTIONS[0])
   const [formIsCashback, setFormIsCashback] = useState(false)
+  const [formIsInvestment, setFormIsInvestment] = useState(false)
   const [formError, setFormError] = useState('')
   const [formSuccess, setFormSuccess] = useState(false)
   
@@ -92,12 +93,15 @@ export function CategoryManager({ initialCategories, userId }: Props) {
       setFormColor(cat.color)
       setFormIcon(cat.icon)
       setFormIsCashback(cat.is_cashback)
+      setFormIsInvestment(cat.is_investment)
     } else {
       setFormType(state.defaultType ?? 'expense')
       setFormName('')
       setFormColor(COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)])
       setFormIcon(ICON_OPTIONS[0])
       setFormIsCashback(false)
+      // Al crear una subcategoría dentro de una categoría de inversión, hereda el valor
+      setFormIsInvestment(state.mode === 'add_sub' ? (cat?.is_investment ?? false) : false)
     }
     
     // Scroll al formulario (al final de la página o donde esté montado)
@@ -106,13 +110,13 @@ export function CategoryManager({ initialCategories, userId }: Props) {
     }, 100)
   }
 
-  const handleDelete = (cat: Category) => {
-    if (confirmDeleteId !== cat.id) {
-      setConfirmDeleteId(cat.id)
-      return
-    }
-    setDeletingId(cat.id)
-    setConfirmDeleteId(null)
+  const handleDeleteClick = (cat: Category) => {
+    setPendingDelete(cat)
+  }
+
+  const handleConfirmDelete = () => {
+    if (!pendingDelete) return
+    const cat = pendingDelete
     startTransition(async () => {
       try {
         await actionDeleteCategory(cat.id)
@@ -130,14 +134,14 @@ export function CategoryManager({ initialCategories, userId }: Props) {
             })
           }
         })
-        
+
         // Si era root, simplemente filtrar (aunque el API devuelve un array de roots, el delete también aplica a roots)
         setCategories((prev) => prev.filter(c => c.id !== cat.id))
 
       } catch (err) {
         console.error(err)
       } finally {
-        setDeletingId(null)
+        setPendingDelete(null)
       }
     })
   }
@@ -156,7 +160,8 @@ export function CategoryManager({ initialCategories, userId }: Props) {
     fd.set('color', formColor)
     fd.set('icon', formIcon)
     fd.set('is_cashback', String(formIsCashback))
-    
+    fd.set('is_investment', String(formIsInvestment))
+
     if (formState.parentId) fd.set('parent_id', formState.parentId)
 
     startTransition(async () => {
@@ -210,6 +215,11 @@ export function CategoryManager({ initialCategories, userId }: Props) {
                   cashback
                 </span>
               )}
+              {cat.is_investment && (
+                <span className="ml-2 text-[10px] font-semibold text-blue-400 bg-blue-400/10 px-1.5 py-0.5 rounded-full">
+                  ticker
+                </span>
+              )}
             </div>
           </div>
 
@@ -218,7 +228,7 @@ export function CategoryManager({ initialCategories, userId }: Props) {
             {!isSub && (
               <button
                 type="button"
-                onClick={() => openForm({ mode: 'add_sub', parentId: cat.id, defaultType: cat.transaction_type })}
+                onClick={() => openForm({ mode: 'add_sub', parentId: cat.id, defaultType: cat.transaction_type }, cat)}
                 className="p-2 text-zinc-500 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
                 title="Añadir subcategoría"
               >
@@ -239,17 +249,11 @@ export function CategoryManager({ initialCategories, userId }: Props) {
             {/* Borrar */}
             <button
               type="button"
-              onClick={() => handleDelete(cat)}
-              disabled={deletingId === cat.id}
-              className={cn(
-                'p-2 rounded-lg transition-all',
-                confirmDeleteId === cat.id
-                  ? 'bg-red-500/20 text-red-400'
-                  : 'text-zinc-500 hover:text-red-400 hover:bg-zinc-800'
-              )}
+              onClick={() => handleDeleteClick(cat)}
+              className="p-2 rounded-lg transition-all text-zinc-500 hover:text-red-400 hover:bg-zinc-800"
               title="Borrar"
             >
-              {deletingId === cat.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+              <Trash2 size={14} />
             </button>
 
             {/* Toggle subs si existen y es padre */}
@@ -342,7 +346,7 @@ export function CategoryManager({ initialCategories, userId }: Props) {
                     <button
                       key={t}
                       type="button"
-                      onClick={() => { setFormType(t); if (t !== 'income') setFormIsCashback(false) }}
+                      onClick={() => { setFormType(t); if (t !== 'income') setFormIsCashback(false); if (t !== 'savings') setFormIsInvestment(false) }}
                       className={cn(
                         'py-2.5 px-3 rounded-xl text-xs font-semibold border-2 transition-all duration-150',
                         formType === t
@@ -433,6 +437,28 @@ export function CategoryManager({ initialCategories, userId }: Props) {
               </button>
             )}
 
+            {/* Inversión (solo ahorro): pide Activo/Ticker al registrar */}
+            {formType === 'savings' && (
+              <button
+                type="button"
+                onClick={() => setFormIsInvestment((v) => !v)}
+                className={cn(
+                  'w-full flex flex-col items-center justify-center gap-1 px-4 py-3 rounded-xl border-2 text-sm font-bold transition-all',
+                  formIsInvestment
+                    ? 'border-blue-500/50 bg-blue-500/10 text-blue-400'
+                    : 'border-zinc-800/80 bg-zinc-900/50 text-zinc-500 hover:border-zinc-700'
+                )}
+              >
+                <span className="flex items-center gap-2">
+                  <span>📈</span>
+                  <span>{formIsInvestment ? 'Es una inversión (pide Activo / Ticker)' : 'Marcar como inversión'}</span>
+                </span>
+                <span className="text-[11px] font-normal normal-case text-zinc-500">
+                  Al registrar, pedirá el activo: Bitcoin, MSCI World, Tesla…
+                </span>
+              </button>
+            )}
+
             {/* Error */}
             {formError && (
               <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
@@ -465,6 +491,21 @@ export function CategoryManager({ initialCategories, userId }: Props) {
           </button>
         )}
       </div>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={pendingDelete ? `¿Eliminar "${pendingDelete.name}"?` : ''}
+        description={
+          pendingDelete
+            ? pendingDelete.parent_id === null && (pendingDelete.subcategories?.length ?? 0) > 0
+              ? `Los movimientos ya registrados se conservan. También se eliminarán sus ${pendingDelete.subcategories!.length} subcategorías.`
+              : 'Los movimientos ya registrados se conservan.'
+            : undefined
+        }
+        loading={isPending}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   )
 }

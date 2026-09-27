@@ -36,6 +36,7 @@ export interface Category {
   name: string
   transaction_type: TransactionType
   is_cashback: boolean
+  is_investment: boolean
   color: string
   icon: string
   sort_order: number

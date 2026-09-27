@@ -4,10 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
+import { reportError } from '@/lib/errors'
 import { Eye, EyeOff, Loader2, AlertCircle, ShieldCheck } from 'lucide-react'
-
-// Mensaje genérico: nunca revelar si el usuario existe o no (prevención de enumeración)
-const GENERIC_ERROR = 'Credenciales incorrectas. Verifica tu usuario/email y contraseña.'
 
 export function LoginForm() {
   const [identifier, setIdentifier] = useState('')
@@ -66,14 +64,9 @@ export function LoginForm() {
       })
 
       if (authError) {
-        // Mostrar mensaje detallado de Supabase para facilitar diagnóstico
-        if (authError.message?.toLowerCase().includes('invalid login credentials')) {
-          setError('Contraseña o usuario/email incorrecto. Verifica que la contraseña sea la exacta.')
-        } else if (authError.message?.toLowerCase().includes('email not confirmed')) {
-          setError('El correo aún no está confirmado en Supabase.')
-        } else {
-          setError(`Error de autenticación: ${authError.message}`)
-        }
+        // AUTH-002: email/usuario o contraseña incorrectos, o email sin confirmar.
+        // El detalle técnico de Supabase se registra aparte; la UI solo muestra el código.
+        setError(reportError('AUTH-002', authError))
         setLoading(false)
         return
       }
@@ -81,8 +74,9 @@ export function LoginForm() {
       // ✅ Sesión iniciada — el middleware detectará la sesión en el siguiente request
       router.push('/dashboard')
       router.refresh()
-    } catch (err: any) {
-      setError(err?.message || GENERIC_ERROR)
+    } catch (err: unknown) {
+      // AUTH-001: no se pudo contactar con Supabase, o cualquier excepción inesperada
+      setError(reportError('AUTH-001', err))
       setLoading(false)
     }
   }

@@ -50,6 +50,10 @@ export const transactionSchema = z
     is_recurring: z.boolean().default(false),
 
     tags: z.array(z.string()).default([]),
+
+    // Campo de UI (no se persiste): indica si la categoría/subcategoría
+    // elegida es de inversión y por tanto requiere un Activo/Ticker.
+    requires_asset: z.boolean().optional(),
   })
   // Validación cruzada: savings requiere cuenta destino
   .refine(
@@ -60,7 +64,7 @@ export const transactionSchema = z
       return true
     },
     {
-      message: 'Selecciona la cuenta destino (broker/inversión)',
+      message: 'Selecciona la cuenta destino',
       path: ['destination_account_id'],
     }
   )
@@ -77,10 +81,10 @@ export const transactionSchema = z
       path: ['destination_account_id'],
     }
   )
-  // Validación: savings requiere concept (nombre del activo)
+  // Validación: las categorías de inversión requieren concept (nombre del activo)
   .refine(
     (data) => {
-      if (data.type === 'savings') {
+      if (data.type === 'savings' && data.requires_asset) {
         return !!data.concept && data.concept.trim().length >= 2
       }
       return true
@@ -105,4 +109,5 @@ export const transactionDefaultValues: Partial<TransactionSchema> = {
   destination_account_id: '',
   concept: '',
   notes: '',
+  requires_asset: false,
 }

@@ -15,9 +15,23 @@ export async function actionAddCategory(formData: FormData) {
   const color = formData.get('color') as string
   const icon = formData.get('icon') as string
   const is_cashback = formData.get('is_cashback') === 'true'
+  const is_investment = transaction_type === 'savings' && formData.get('is_investment') === 'true'
   const parent_id = formData.get('parent_id') as string | null
 
   if (!name || !transaction_type) throw new Error('Nombre y tipo son obligatorios')
+
+  // Evitar duplicados: misma categoría (user_id + nombre, sin distinguir mayúsculas) en el mismo tipo y nivel
+  let dupQuery = (supabase as any)
+    .from('categories')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('transaction_type', transaction_type)
+    .eq('is_active', true)
+    .ilike('name', name)
+  dupQuery = parent_id ? dupQuery.eq('parent_id', parent_id) : dupQuery.is('parent_id', null)
+
+  const { data: duplicate } = await dupQuery.maybeSingle()
+  if (duplicate) throw new Error(`Ya existe una categoría llamada "${name}" en este tipo`)
 
   // Siguiente sort_order
   const { data: existing } = await (supabase as any)
@@ -37,6 +51,7 @@ export async function actionAddCategory(formData: FormData) {
     color,
     icon,
     is_cashback,
+    is_investment,
     user_id: user.id,
     sort_order: nextOrder,
     is_active: true,
@@ -60,9 +75,24 @@ export async function actionUpdateCategory(id: string, formData: FormData) {
   const color = formData.get('color') as string
   const icon = formData.get('icon') as string
   const is_cashback = formData.get('is_cashback') === 'true'
+  const is_investment = transaction_type === 'savings' && formData.get('is_investment') === 'true'
   const parent_id = formData.get('parent_id') as string | null
 
   if (!name || !transaction_type) throw new Error('Nombre y tipo son obligatorios')
+
+  // Evitar duplicados con otra categoría existente (excluyendo la que se está editando)
+  let dupQuery = (supabase as any)
+    .from('categories')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('transaction_type', transaction_type)
+    .eq('is_active', true)
+    .ilike('name', name)
+    .neq('id', id)
+  dupQuery = parent_id ? dupQuery.eq('parent_id', parent_id) : dupQuery.is('parent_id', null)
+
+  const { data: duplicate } = await dupQuery.maybeSingle()
+  if (duplicate) throw new Error(`Ya existe una categoría llamada "${name}" en este tipo`)
 
   const { error } = await (supabase as any)
     .from('categories')
@@ -72,6 +102,7 @@ export async function actionUpdateCategory(id: string, formData: FormData) {
       color,
       icon,
       is_cashback,
+      is_investment,
       parent_id: parent_id ?? null,
     })
     .eq('id', id)

@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getDashboardData, getAccountBalances } from '@/lib/queries/dashboard'
 import { MonthlyChart } from '@/components/dashboard/MonthlyChart'
 import { CashbackChart } from '@/components/dashboard/CashbackChart'
+import { Patrimonio } from '@/components/dashboard/Patrimonio'
 import { LogoutButton } from '@/components/auth/LogoutButton'
 import { formatCurrency } from '@/lib/utils'
 
@@ -44,11 +45,6 @@ export default async function DashboardPage() {
   }
 
   const totalCashback = chartData.reduce((s, d) => s + d.cashback, 0)
-  const liquidAccounts = accounts.filter((a) => a.type !== 'broker')
-  const brokerAccounts = accounts.filter((a) => a.type === 'broker')
-  const totalLiquid = liquidAccounts.reduce((s, a) => s + a.balance, 0)
-  const totalBroker = brokerAccounts.reduce((s, a) => s + a.balance, 0)
-  const totalWealth = totalLiquid + totalBroker
 
   const stats = [
     {
@@ -192,81 +188,11 @@ export default async function DashboardPage() {
         {/* ── PATRIMONIO ────────────────────────────────────── */}
         <section aria-labelledby="wealth-section">
           <div className="rounded-2xl border border-zinc-800/70 bg-zinc-900/50 p-5 mb-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 id="wealth-section" className="text-sm font-semibold text-zinc-200">
-                Patrimonio
-              </h2>
-              <span className="text-sm font-bold text-zinc-100">
-                {formatCurrency(totalWealth)}
-              </span>
-            </div>
+            <h2 id="wealth-section" className="text-sm font-semibold text-zinc-200 mb-4">
+              Patrimonio
+            </h2>
 
-            {accounts.length === 0 ? (
-              <p className="text-xs text-zinc-600 text-center py-4">
-                Sin cuentas configuradas aún
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {/* Liquid */}
-                {totalWealth > 0 && (
-                  <>
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs font-medium text-zinc-500">
-                          Efectivo / Banco
-                        </span>
-                        <span className="text-xs font-semibold text-emerald-400">
-                          {formatCurrency(totalLiquid)}
-                        </span>
-                      </div>
-                      <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-emerald-500/70 transition-all duration-700"
-                          style={{ width: `${totalWealth > 0 ? (totalLiquid / totalWealth) * 100 : 0}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs font-medium text-zinc-500">
-                          Bonos / Inversión
-                        </span>
-                        <span className="text-xs font-semibold text-blue-400">
-                          {formatCurrency(totalBroker)}
-                        </span>
-                      </div>
-                      <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-blue-500/70 transition-all duration-700"
-                          style={{ width: `${totalWealth > 0 ? (totalBroker / totalWealth) * 100 : 0}%` }}
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {/* Detalle de cuentas */}
-                <div className="pt-2 border-t border-zinc-800/60 space-y-2">
-                  {accounts.map((acc) => (
-                    <div key={acc.account_id} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="w-2 h-2 rounded-full shrink-0"
-                          style={{ backgroundColor: acc.color }}
-                        />
-                        <span className="text-xs text-zinc-500">{acc.name}</span>
-                      </div>
-                      <span className={`text-xs font-semibold ${
-                        acc.balance >= 0 ? 'text-zinc-300' : 'text-red-400'
-                      }`}>
-                        {formatCurrency(acc.balance)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <Patrimonio accounts={accounts} />
           </div>
         </section>
 

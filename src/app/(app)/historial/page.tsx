@@ -1,19 +1,18 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { format, isToday, isYesterday, parseISO } from 'date-fns'
+import { format, isToday, isYesterday, parseISO, startOfMonth, subMonths, addMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
   TrendingUp, TrendingDown, PiggyBank, Trash2,
-  X, Loader2, InboxIcon, AlertTriangle,
+  X, Loader2, InboxIcon, AlertTriangle, ChevronLeft, ChevronRight,
 } from 'lucide-react'
-import { cn, formatCurrency, getCurrentMonthRange, getLastMonthRange } from '@/lib/utils'
+import { cn, formatCurrency, getMonthRange } from '@/lib/utils'
 import { getTransactions, deleteTransaction } from '@/lib/queries/transactions'
 import type { Transaction, TransactionType } from '@/types/database'
 
 // ── Tipos y helpers locales ──────────────────────────────────
 type TabType = 'all' | TransactionType
-type PeriodType = 'current' | 'last'
 
 const TABS: { value: TabType; label: string }[] = [
   { value: 'all', label: 'Todos' },
@@ -21,6 +20,10 @@ const TABS: { value: TabType; label: string }[] = [
   { value: 'expense', label: 'Gastos' },
   { value: 'savings', label: 'Ahorro' },
 ]
+
+function isSameMonth(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()
+}
 
 const TYPE_ICON: Record<TransactionType, React.ElementType> = {
   income: TrendingUp,
@@ -64,22 +67,33 @@ function groupByDate(txs: Transaction[]): [string, Transaction[]][] {
 
 // ── Componente principal ─────────────────────────────────────
 export default function HistorialPage() {
+  const currentMonthStart = startOfMonth(new Date())
+
   const [tab, setTab] = useState<TabType>('all')
-  const [period, setPeriod] = useState<PeriodType>('current')
+  const [selectedMonth, setSelectedMonth] = useState<Date>(currentMonthStart)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
+  const isCurrentMonth = isSameMonth(selectedMonth, currentMonthStart)
+
+  const goToPrevMonth = () => setSelectedMonth((d) => startOfMonth(subMonths(d, 1)))
+  const goToNextMonth = () => {
+    if (isCurrentMonth) return
+    setSelectedMonth((d) => startOfMonth(addMonths(d, 1)))
+  }
+  const goToCurrentMonth = () => setSelectedMonth(currentMonthStart)
+
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const range = period === 'current' ? getCurrentMonthRange() : getLastMonthRange()
+    const { from: dateFrom, to: dateTo } = getMonthRange(selectedMonth)
     try {
       const { data } = await getTransactions({
         type: tab === 'all' ? undefined : tab,
-        dateFrom: range.from,
-        dateTo: range.to,
+        dateFrom,
+        dateTo,
         limit: 100,
       })
       setTransactions(data)
@@ -88,7 +102,7 @@ export default function HistorialPage() {
     } finally {
       setLoading(false)
     }
-  }, [tab, period])
+  }, [tab, selectedMonth])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -164,25 +178,43 @@ export default function HistorialPage() {
             ))}
           </div>
 
-          {/* Filtro de período */}
-          <div className="flex gap-2 mb-6">
-            {([['current', 'Este mes'], ['last', 'Mes pasado']] as const).map(
-              ([value, label]) => (
-                <button
-                  key={value}
-                  id={`period-${value}`}
-                  onClick={() => setPeriod(value)}
-                  className={cn(
-                    'px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all duration-200',
-                    period === value
-                      ? 'bg-violet-500/15 border border-violet-500/40 text-violet-300'
-                      : 'border border-zinc-800 text-zinc-600 hover:border-zinc-700 hover:text-zinc-400'
-                  )}
-                >
-                  {label}
-                </button>
-              )
-            )}
+          {/* Selector de mes (‹ mes actual ›) */}
+          <div className="flex items-center justify-between gap-1 mb-6 bg-zinc-900 border border-zinc-800 rounded-xl px-1.5 py-1.5">
+            <button
+              type="button"
+              id="btn-prev-month"
+              onClick={goToPrevMonth}
+              aria-label="Mes anterior"
+              className="p-2.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors active:scale-95"
+            >
+              <ChevronLeft size={18} />
+            </button>
+
+            <button
+              type="button"
+              id="btn-current-month"
+              onClick={goToCurrentMonth}
+              title="Volver al mes actual"
+              className="flex-1 text-center text-sm font-semibold text-zinc-200 hover:text-violet-300 transition-colors py-1.5 capitalize"
+            >
+              {format(selectedMonth, 'MMMM yyyy', { locale: es })}
+            </button>
+
+            <button
+              type="button"
+              id="btn-next-month"
+              onClick={goToNextMonth}
+              disabled={isCurrentMonth}
+              aria-label="Mes siguiente"
+              className={cn(
+                'p-2.5 rounded-lg transition-colors active:scale-95',
+                isCurrentMonth
+                  ? 'text-zinc-700 cursor-not-allowed'
+                  : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
+              )}
+            >
+              <ChevronRight size={18} />
+            </button>
           </div>
 
           {/* Lista de transacciones */}

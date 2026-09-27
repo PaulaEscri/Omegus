@@ -17,9 +17,5 @@ export function useAccounts() {
       .finally(() => setIsLoading(false))
   }, [])
 
-  // Filtrar por tipo para el selector de cuenta destino (savings)
-  const brokerAccounts = accounts.filter((a) => a.type === 'broker')
-  const liquidAccounts = accounts.filter((a) => a.type !== 'broker')
-
-  return { accounts, brokerAccounts, liquidAccounts, isLoading, error }
+  return { accounts, isLoading, error }
 }

@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/client'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database'
 
 // ── Activos únicos del usuario (para el Combobox) ─────────────
 export async function getPastSavingsConcepts(): Promise<string[]> {
@@ -44,11 +46,10 @@ const ASSET_COLORS = [
   '#a855f7', '#06b6d4', '#eab308', '#64748b', '#d946ef',
 ]
 
-export async function getPortfolioData(): Promise<{
+export async function getPortfolioData(supabase: SupabaseClient<Database>): Promise<{
   assets: PortfolioAsset[]
   totalInvested: number
 }> {
-  const supabase = createClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('transactions')

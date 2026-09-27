@@ -1,6 +1,7 @@
 import type { TransactionType } from '@/types/database'
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { format } from 'date-fns'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -31,24 +32,26 @@ export function formatDateLong(dateStr: string): string {
   }).format(new Date(dateStr + 'T00:00:00'))
 }
 
-export function getCurrentMonthRange(): { from: string; to: string } {
-  const now = new Date()
-  const from = new Date(now.getFullYear(), now.getMonth(), 1)
-  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+// ── Rango de fechas de un mes (usa hora local, no UTC) ───────
+// date-fns `format` lee los componentes locales del Date, evitando el
+// desfase de un día que produce Date.toISOString() en husos horarios
+// adelantados a UTC (España, UTC+1/+2).
+export function getMonthRange(date: Date): { from: string; to: string } {
+  const from = new Date(date.getFullYear(), date.getMonth(), 1)
+  const to = new Date(date.getFullYear(), date.getMonth() + 1, 0)
   return {
-    from: from.toISOString().split('T')[0],
-    to: to.toISOString().split('T')[0],
+    from: format(from, 'yyyy-MM-dd'),
+    to: format(to, 'yyyy-MM-dd'),
   }
+}
+
+export function getCurrentMonthRange(): { from: string; to: string } {
+  return getMonthRange(new Date())
 }
 
 export function getLastMonthRange(): { from: string; to: string } {
   const now = new Date()
-  const from = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-  const to = new Date(now.getFullYear(), now.getMonth(), 0)
-  return {
-    from: from.toISOString().split('T')[0],
-    to: to.toISOString().split('T')[0],
-  }
+  return getMonthRange(new Date(now.getFullYear(), now.getMonth() - 1, 1))
 }
 
 export const TRANSACTION_COLORS: Record<TransactionType, string> = {
