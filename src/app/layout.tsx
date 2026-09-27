@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   },
   description: 'Control total de tus finanzas personales: ingresos, gastos, ahorro e inversión.',
   applicationName: 'Finanzas Personales',
-  manifest: '/manifest.json',
+  manifest: '/omegus/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
@@ -40,7 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es" className={`${geist.variable} dark`} suppressHydrationWarning>
       <head>
-        <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/omegus/icons/apple-touch-icon.png" />
       </head>
       <body className="min-h-[100dvh] bg-zinc-950 text-zinc-50 antialiased overflow-x-hidden selection:bg-violet-500/30">
         {children}
