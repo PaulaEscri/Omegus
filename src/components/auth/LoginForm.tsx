@@ -104,7 +104,7 @@ export function LoginForm() {
           spellCheck={false}
           value={identifier}
           onChange={(e) => setIdentifier(e.target.value)}
-          placeholder="peufeliz  o  tu@email.com"
+          placeholder="Usuario o email"
           required
           disabled={loading}
           className={cn(
