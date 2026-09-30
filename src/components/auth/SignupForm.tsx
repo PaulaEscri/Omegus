@@ -36,6 +36,12 @@ export function SignupForm() {
       return
     }
 
+    // AUTH-012: validación de cliente, mínimo 6 caracteres
+    if (password.length < 6) {
+      setError(reportError('AUTH-012'))
+      return
+    }
+
     setLoading(true)
 
     const result = await createUserAsAdmin({

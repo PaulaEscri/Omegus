@@ -53,6 +53,9 @@ export async function createUserAsAdmin(input: CreateUserInput): Promise<CreateU
     })
 
     if (error) {
+      if ((error as { code?: string }).code === 'weak_password') {
+        return { ok: false, code: 'AUTH-012' }
+      }
       reportError('AUTH-003', error)
       return { ok: false, code: 'AUTH-003' }
     }

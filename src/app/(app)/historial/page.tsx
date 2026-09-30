@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { format, isToday, isYesterday, parseISO, startOfMonth, subMonths, addMonths } from 'date-fns'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { format, isToday, isYesterday, parseISO, startOfMonth, subMonths, addMonths, eachMonthOfInterval } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
   TrendingUp, TrendingDown, PiggyBank, Trash2,
-  X, Loader2, InboxIcon, AlertTriangle, ChevronLeft, ChevronRight,
+  X, Loader2, InboxIcon, AlertTriangle, ChevronLeft, ChevronRight, CalendarDays,
 } from 'lucide-react'
 import { cn, formatCurrency, getMonthRange } from '@/lib/utils'
 import { getTransactions, deleteTransaction } from '@/lib/queries/transactions'
@@ -76,6 +76,14 @@ export default function HistorialPage() {
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [showMonthPicker, setShowMonthPicker] = useState(false)
+
+  // Lista de meses desde enero 2026 hasta el mes actual
+  const availableMonths = useMemo(() => {
+    const start = new Date(2026, 0, 1) // enero 2026
+    const end = currentMonthStart
+    return eachMonthOfInterval({ start, end }).reverse() // más reciente primero
+  }, [currentMonthStart])
 
   const isCurrentMonth = isSameMonth(selectedMonth, currentMonthStart)
 
@@ -192,11 +200,12 @@ export default function HistorialPage() {
 
             <button
               type="button"
-              id="btn-current-month"
-              onClick={goToCurrentMonth}
-              title="Volver al mes actual"
-              className="flex-1 text-center text-sm font-semibold text-zinc-200 hover:text-violet-300 transition-colors py-1.5 capitalize"
+              id="btn-pick-month"
+              onClick={() => setShowMonthPicker(true)}
+              title="Seleccionar mes"
+              className="flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold text-zinc-200 hover:text-violet-300 transition-colors py-1.5 capitalize"
             >
+              <CalendarDays size={14} className="text-zinc-500" />
               {format(selectedMonth, 'MMMM yyyy', { locale: es })}
             </button>
 
@@ -312,6 +321,79 @@ export default function HistorialPage() {
 
         </div>
       </div>
+
+      {/* ── MONTH PICKER DRAWER ──────────────────────────── */}
+      {showMonthPicker && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm animate-fade-in"
+            onClick={() => setShowMonthPicker(false)}
+            aria-hidden="true"
+          />
+
+          {/* Sheet */}
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Seleccionar mes"
+            className="fixed bottom-0 left-0 right-0 z-50 animate-slide-up"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+          >
+            <div className="max-w-md mx-auto rounded-t-3xl border-t border-x border-zinc-800 bg-zinc-950 px-5 pt-5 pb-4">
+              {/* Handle */}
+              <div className="w-10 h-1 rounded-full bg-zinc-700 mx-auto mb-5" />
+
+              {/* Título */}
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-bold text-zinc-100">Seleccionar mes</h2>
+                <button
+                  onClick={() => setShowMonthPicker(false)}
+                  className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+                  aria-label="Cerrar"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Lista de meses */}
+              <div className="overflow-y-auto max-h-72 -mx-2 px-2 space-y-1 pb-2">
+                {availableMonths.map((month) => {
+                  const isSelected = isSameMonth(month, selectedMonth)
+                  const isThisMonth = isSameMonth(month, currentMonthStart)
+                  return (
+                    <button
+                      key={month.toISOString()}
+                      onClick={() => {
+                        setSelectedMonth(startOfMonth(month))
+                        setShowMonthPicker(false)
+                      }}
+                      className={cn(
+                        'w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-semibold transition-all active:scale-[0.98]',
+                        isSelected
+                          ? 'bg-violet-600 text-white'
+                          : 'text-zinc-300 hover:bg-zinc-800/70'
+                      )}
+                    >
+                      <span className="capitalize">
+                        {format(month, 'MMMM yyyy', { locale: es })}
+                      </span>
+                      {isThisMonth && !isSelected && (
+                        <span className="text-[10px] font-bold text-violet-400 bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded-full">
+                          Actual
+                        </span>
+                      )}
+                      {isSelected && (
+                        <span className="text-[10px] font-bold text-white/70">✓</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ── DELETE DRAWER ─────────────────────────────────── */}
       {selectedTx && (

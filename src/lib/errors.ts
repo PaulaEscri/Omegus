@@ -9,6 +9,7 @@ export type ErrorCode =
   | 'AUTH-002' // Credenciales inválidas — signInWithPassword devuelve error
   | 'AUTH-003' // Error al crear cuenta — signUp/auth.admin.createUser/updateUser devuelve error
   | 'AUTH-004' // Falta nombre de usuario — validación de cliente antes de crear cuenta
+  | 'AUTH-012' // Contraseña débil — la contraseña no cumple los requisitos mínimos (mín. 6 caracteres)
   | 'AUTH-005' // Sesión no válida — acceptInvitation no encuentra usuario en el cliente de servidor
   | 'AUTH-006' // Contraseñas distintas — validación de cliente al crear cuenta
   | 'AUTH-007' // Solo admin — createUserAsAdmin/inviteUser invocada por alguien sin profiles.is_admin
@@ -22,6 +23,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   'AUTH-002': 'Email o contraseña incorrectos',
   'AUTH-003': 'No se pudo crear la cuenta',
   'AUTH-004': 'Introduce un nombre de usuario',
+  'AUTH-012': 'La contraseña debe tener al menos 6 caracteres',
   'AUTH-005': 'Tu sesión no es válida, vuelve a intentarlo',
   'AUTH-006': 'Las contraseñas no coinciden',
   'AUTH-007': 'No tienes permiso para crear cuentas',
