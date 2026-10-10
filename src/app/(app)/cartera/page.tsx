@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 }
 
 export const dynamic = 'force-dynamic'
-
+// cambio
 export default async function CarteraPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
