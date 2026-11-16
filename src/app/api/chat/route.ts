@@ -180,7 +180,9 @@ export async function POST(req: Request) {
           message:
             status === 429
               ? 'El servicio de IA está saturado. Inténtalo en un minuto.'
-              : status === 401 || status === 403
+              : status === 404
+                ? 'El modelo de IA configurado ya no está disponible. Hay que actualizar LLM_MODEL.'
+                : status === 401 || status === 403
                 ? 'La configuración del asistente no es válida.'
                 : `No he podido responder (error ${status ?? 'de conexión'} del proveedor de IA). Inténtalo de nuevo.`,
         })

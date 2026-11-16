@@ -26,7 +26,7 @@
   // y NO debe escribirse nunca en este archivo.
   "vars": {
     "LLM_BASE_URL": "https://generativelanguage.googleapis.com/v1beta/openai/",
-    "LLM_MODEL": "gemini-2.5-flash"
+    "LLM_MODEL": "gemini-3.8-flash"
   },
   "assets": {
     "directory": ".open-next/assets",
