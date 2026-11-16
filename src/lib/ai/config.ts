@@ -5,6 +5,7 @@
 //   LLM_BASE_URL  p. ej. https://api.groq.com/openai/v1   |   http://localhost:11434/v1 (Ollama)
 //   LLM_MODEL     p. ej. llama-3.3-70b-versatile          |   qwen2.5:7b
 //   LLM_API_KEY   clave del proveedor (opcional con Ollama)
+//   LLM_FALLBACK_MODEL  (opcional) modelo de respaldo si el principal está caído/saturado
 //   AI_DAILY_LIMIT  peticiones/día por usuario (por defecto 100)
 //
 // El modelo DEBE soportar tool-calling (function calling).
@@ -14,6 +15,7 @@ import OpenAI from 'openai'
 export interface LLM {
   client: OpenAI
   model: string
+  fallbackModel: string | null
 }
 
 export function isLLMConfigured(): boolean {
@@ -30,10 +32,11 @@ export function getLLM(): LLM | null {
       baseURL,
       // El SDK exige una clave no vacía; servidores como Ollama la ignoran.
       apiKey: process.env.LLM_API_KEY || 'not-needed',
-      maxRetries: 1,
+      maxRetries: 2, // el SDK ya reintenta 408/409/429/5xx con espera
       timeout: 45_000,
     }),
     model,
+    fallbackModel: process.env.LLM_FALLBACK_MODEL?.trim() || null,
   }
 }
 

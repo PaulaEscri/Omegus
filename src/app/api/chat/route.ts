@@ -93,19 +93,37 @@ export async function POST(req: Request) {
       const send = (ev: StreamEvent) => controller.enqueue(encoder.encode(JSON.stringify(ev) + '\n'))
       const contexts: string[] = []
 
+      const createStream = (model: string) =>
+        llm.client.chat.completions.create(
+          {
+            model,
+            messages,
+            tools: TOOLS,
+            tool_choice: 'auto',
+            temperature: 0.3,
+            stream: true,
+          },
+          { signal: req.signal }
+        )
+
       try {
         for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-          const completion = await llm.client.chat.completions.create(
-            {
-              model: llm.model,
-              messages,
-              tools: TOOLS,
-              tool_choice: 'auto',
-              temperature: 0.3,
-              stream: true,
-            },
-            { signal: req.signal }
-          )
+          // Si el modelo principal falla por saturación/caída (o ya no existe), prueba el de respaldo
+          const models = llm.fallbackModel ? [llm.model, llm.fallbackModel] : [llm.model]
+          let completion: Awaited<ReturnType<typeof createStream>> | undefined
+          let lastErr: unknown
+          for (const model of models) {
+            try {
+              completion = await createStream(model)
+              break
+            } catch (e) {
+              lastErr = e
+              const st = (e as { status?: number })?.status
+              if (req.signal.aborted || !(st === 404 || st === 429 || (typeof st === 'number' && st >= 500))) throw e
+              console.error('[ai] modelo no disponible:', model, st)
+            }
+          }
+          if (!completion) throw lastErr
 
           let text = ''
           const calls = new Map<number, { id: string; name: string; args: string }>()
@@ -180,7 +198,9 @@ export async function POST(req: Request) {
           message:
             status === 429
               ? 'El servicio de IA está saturado. Inténtalo en un minuto.'
-              : status === 404
+              : typeof status === 'number' && status >= 500
+                ? 'El servicio de IA está sobrecargado o caído ahora mismo. Inténtalo de nuevo en unos segundos.'
+                : status === 404
                 ? 'El modelo de IA configurado ya no está disponible. Hay que actualizar LLM_MODEL.'
                 : status === 401 || status === 403
                 ? 'La configuración del asistente no es válida.'
