@@ -1,8 +1,17 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
 import { TrendingUp, ArrowUpRight, Clock, Layers } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { getPortfolioData } from '@/lib/queries/portfolio'
+import { getPortfolioData, type PortfolioAsset } from '@/lib/queries/portfolio'
+import { fetchPortfolioPrices, applyMarketPrices } from '@/lib/queries/portfolioMarket'
+import {
+  MarketValueCard,
+  MarketValueCardSkeleton,
+  MarketFootnote,
+  AssetAmounts,
+  AssetAmountsLive,
+} from './MarketBlocks'
 import { PortfolioDonut } from '@/components/dashboard/PortfolioDonut'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { getSessionUser } from '@/lib/auth/session'
@@ -13,13 +22,14 @@ export const metadata: Metadata = {
 }
 
 export const dynamic = 'force-dynamic'
-// cambio
+
 export default async function CarteraPage() {
   const supabase = await createClient()
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  let assets: Awaited<ReturnType<typeof getPortfolioData>>['assets'] = []
+  // Parte rápida: solo BD. Se pinta al instante.
+  let assets: PortfolioAsset[] = []
   let totalInvested = 0
 
   try {
@@ -29,6 +39,12 @@ export default async function CarteraPage() {
   } catch (err) {
     console.error('Portfolio data error:', err)
   }
+
+  // Parte lenta: precios de mercado. NO se espera aquí: la promesa se pasa a
+  // los bloques que la necesitan, cada uno dentro de su <Suspense>.
+  const marketPromise = fetchPortfolioPrices(assets).then((prices) =>
+    applyMarketPrices(assets, totalInvested, prices)
+  )
 
   // Activo con más peso
   const topAsset = assets[0]
@@ -50,27 +66,35 @@ export default async function CarteraPage() {
           </h1>
         </header>
 
-        {/* ── TOTAL INVERTIDO (hero card) ──────────────────── */}
-        <section aria-labelledby="total-invested-label">
-          <div className="rounded-2xl bg-gradient-to-br from-violet-600/20 via-blue-600/10 to-zinc-900/50 border border-violet-500/20 p-6">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-xl bg-violet-500/20 flex items-center justify-center">
-                <TrendingUp size={16} className="text-violet-400" />
+        {/* ── INVERTIDO vs VALOR REAL (hero cards) ─────────── */}
+        <section aria-labelledby="total-invested-label" className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl bg-gradient-to-br from-violet-600/20 via-blue-600/10 to-zinc-900/50 border border-violet-500/20 p-5">
+            <div className="flex items-center gap-2 mb-2.5">
+              <div className="w-7 h-7 rounded-lg bg-violet-500/20 flex items-center justify-center">
+                <TrendingUp size={14} className="text-violet-400" />
               </div>
-              <p id="total-invested-label" className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                Total Invertido
+              <p id="total-invested-label" className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
+                Invertido
               </p>
             </div>
-            <p className="text-4xl font-bold text-violet-300 tracking-tight">
+            <p className="text-2xl font-bold text-violet-300 tracking-tight">
               {formatCurrency(totalInvested)}
             </p>
             {assets.length > 0 && (
-              <p className="text-xs text-zinc-500 mt-2">
-                Distribuido en {assets.length} {assets.length === 1 ? 'activo' : 'activos'}
+              <p className="text-[11px] text-zinc-500 mt-1.5">
+                {assets.length} {assets.length === 1 ? 'activo' : 'activos'}
               </p>
             )}
           </div>
+
+          <Suspense fallback={<MarketValueCardSkeleton />}>
+            <MarketValueCard marketPromise={marketPromise} />
+          </Suspense>
         </section>
+
+        <Suspense fallback={null}>
+          <MarketFootnote marketPromise={marketPromise} />
+        </Suspense>
 
         {/* ── DONUT CHART ──────────────────────────────────── */}
         <section aria-labelledby="chart-portfolio">
@@ -119,15 +143,15 @@ export default async function CarteraPage() {
                           <span className="text-sm font-semibold text-zinc-200">
                             {asset.concept}
                           </span>
+                          {asset.ticker && (
+                            <span className="text-[9px] font-bold text-zinc-500 bg-zinc-800/80 px-1.5 py-0.5 rounded">
+                              {asset.ticker}
+                            </span>
+                          )}
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm font-bold text-zinc-100">
-                            {formatCurrency(asset.totalInvested)}
-                          </p>
-                          <p className="text-[10px] text-zinc-500">
-                            {pct.toFixed(1)}%
-                          </p>
-                        </div>
+                        <Suspense fallback={<AssetAmounts asset={asset} marketValue={null} />}>
+                          <AssetAmountsLive marketPromise={marketPromise} asset={asset} />
+                        </Suspense>
                       </div>
 
                       {/* Barra de porcentaje */}

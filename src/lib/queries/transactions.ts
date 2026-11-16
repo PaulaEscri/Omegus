@@ -20,6 +20,8 @@ export async function createTransaction(
     account_id: formData.account_id,
     destination_account_id: formData.destination_account_id || null,
     concept: formData.concept,
+    ticker: formData.ticker?.trim() ? formData.ticker.trim().toUpperCase() : null,
+    quantity: formData.quantity ?? null,
     notes: formData.notes || null,
     transaction_date: format(formData.transaction_date, 'yyyy-MM-dd'),
     is_recurring: formData.is_recurring,

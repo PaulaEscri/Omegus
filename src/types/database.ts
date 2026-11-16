@@ -56,6 +56,8 @@ export interface Transaction {
   account_id: string | null
   destination_account_id: string | null
   concept: string
+  ticker: string | null
+  quantity: number | null
   notes: string | null
   transaction_date: string
   is_recurring: boolean
@@ -77,6 +79,8 @@ export interface TransactionFormData {
   account_id: string
   destination_account_id?: string
   concept: string
+  ticker?: string
+  quantity?: number
   notes?: string
   transaction_date: Date
   is_recurring: boolean

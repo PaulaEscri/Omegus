@@ -107,6 +107,8 @@ export function TransactionForm({ userId, onSuccess }: TransactionFormProps) {
       tags: [],
       subcategory_id: '',
       destination_account_id: '',
+      ticker: '',
+      quantity: undefined,
       notes: '',
     },
   })
@@ -570,6 +572,96 @@ export function TransactionForm({ userId, onSuccess }: TransactionFormProps) {
         />
       </section>
 
+      {/* ── 5b. TICKER / UNIDADES (solo inversión) ───────────── */}
+      {requiresAsset && (
+        <section aria-labelledby="section-ticker" className="grid grid-cols-2 gap-3">
+          <div>
+            <label
+              id="section-ticker"
+              htmlFor="ticker-input"
+              className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2"
+            >
+              Ticker (opcional)
+            </label>
+            <Controller
+              name="ticker"
+              control={control}
+              render={({ field }) => (
+                <input
+                  {...field}
+                  id="ticker-input"
+                  type="text"
+                  placeholder="Ej: AAPL"
+                  autoComplete="off"
+                  aria-invalid={!!errors.ticker}
+                  aria-describedby={errors.ticker ? 'ticker-error' : undefined}
+                  onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                  className={cn(
+                    'w-full px-3 py-3 rounded-xl border-2 outline-none uppercase',
+                    'bg-zinc-900/80 text-zinc-100 text-sm placeholder:text-zinc-600 placeholder:normal-case',
+                    'transition-all duration-200',
+                    errors.ticker
+                      ? 'border-red-500/60'
+                      : 'border-zinc-800 focus:border-blue-500/50'
+                  )}
+                />
+              )}
+            />
+            {errors.ticker && (
+              <p id="ticker-error" role="alert" className="mt-1.5 text-xs text-red-400 px-1">
+                {errors.ticker.message}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label
+              htmlFor="quantity-input"
+              className="block text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2"
+            >
+              Unidades (opcional)
+            </label>
+            <Controller
+              name="quantity"
+              control={control}
+              render={({ field }) => (
+                <input
+                  id="quantity-input"
+                  type="number"
+                  step="any"
+                  min="0"
+                  inputMode="decimal"
+                  placeholder="Ej: 10"
+                  autoComplete="off"
+                  value={field.value ?? ''}
+                  aria-invalid={!!errors.quantity}
+                  aria-describedby={errors.quantity ? 'quantity-error' : undefined}
+                  onChange={(e) =>
+                    field.onChange(e.target.value === '' ? undefined : parseFloat(e.target.value))
+                  }
+                  className={cn(
+                    'w-full px-3 py-3 rounded-xl border-2 outline-none',
+                    'bg-zinc-900/80 text-zinc-100 text-sm placeholder:text-zinc-600',
+                    'transition-all duration-200',
+                    errors.quantity
+                      ? 'border-red-500/60'
+                      : 'border-zinc-800 focus:border-blue-500/50'
+                  )}
+                />
+              )}
+            />
+            {errors.quantity && (
+              <p id="quantity-error" role="alert" className="mt-1.5 text-xs text-red-400 px-1">
+                {errors.quantity.message}
+              </p>
+            )}
+          </div>
+
+          <p className="col-span-2 text-[11px] text-zinc-500 -mt-1">
+            Rellena ambos para ver el valor de mercado real en Cartera.
+          </p>
+        </section>
+      )}
 
       {/* ── 6. CUENTA ────────────────────────────────────────── */}
       <section aria-labelledby="section-account">

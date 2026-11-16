@@ -36,6 +36,20 @@ export const transactionSchema = z
       .optional()
       .or(z.literal('')),
 
+    // Solo relevantes para inversiones: permiten calcular el valor de
+    // mercado real en Cartera. Ambos opcionales, pero si se rellena uno
+    // se exige el otro (ver refine más abajo).
+    ticker: z
+      .string()
+      .max(15, { message: 'Máximo 15 caracteres' })
+      .optional()
+      .or(z.literal('')),
+
+    quantity: z
+      .number({ invalid_type_error: 'La cantidad debe ser un número' })
+      .positive({ message: 'La cantidad debe ser mayor que 0' })
+      .optional(),
+
     notes: z
       .string()
       .max(500, { message: 'Máximo 500 caracteres' })
@@ -94,6 +108,32 @@ export const transactionSchema = z
       path: ['concept'],
     }
   )
+  // Validación: ticker y quantity van juntos (si se rellena uno, el otro
+  // es necesario para poder calcular el valor de mercado)
+  .refine(
+    (data) => {
+      if (data.ticker && data.ticker.trim() && !data.quantity) {
+        return false
+      }
+      return true
+    },
+    {
+      message: 'Indica la cantidad de unidades/acciones',
+      path: ['quantity'],
+    }
+  )
+  .refine(
+    (data) => {
+      if (data.quantity && !(data.ticker && data.ticker.trim())) {
+        return false
+      }
+      return true
+    },
+    {
+      message: 'Indica el ticker para calcular el valor de mercado',
+      path: ['ticker'],
+    }
+  )
 
 export type TransactionSchema = z.infer<typeof transactionSchema>
 export type TransactionFormInput = z.input<typeof transactionSchema>
@@ -108,6 +148,8 @@ export const transactionDefaultValues: Partial<TransactionSchema> = {
   subcategory_id: '',
   destination_account_id: '',
   concept: '',
+  ticker: '',
+  quantity: undefined,
   notes: '',
   requires_asset: false,
 }

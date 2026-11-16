@@ -37,6 +37,8 @@ export interface PortfolioAsset {
   txCount: number         // número de transacciones
   lastDate: string        // fecha más reciente
   color: string           // color determinístico por concepto
+  ticker: string | null   // símbolo bursátil, si se indicó
+  quantity: number        // nº de unidades/acciones acumuladas
 }
 
 // Paleta de colores para los activos (cicla si hay más de 12)
@@ -53,20 +55,28 @@ export async function getPortfolioData(supabase: SupabaseClient<Database>): Prom
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from('transactions')
-    .select('concept, amount, transaction_date')
+    .select('concept, amount, transaction_date, ticker, quantity')
     .eq('type', 'savings')
     .order('transaction_date', { ascending: false })
 
   if (error) throw error
 
   // Agrupar por concept
-  const map = new Map<string, { total: number; count: number; lastDate: string }>()
+  const map = new Map<
+    string,
+    { total: number; count: number; lastDate: string; ticker: string | null; quantity: number }
+  >()
   for (const row of data ?? []) {
     const key = (row.concept as string)?.trim() || 'Sin nombre'
+    const rowTicker = (row.ticker as string | null)?.trim() || null
+    const rowQuantity = Number(row.quantity) || 0
     const existing = map.get(key)
     if (existing) {
       existing.total += Number(row.amount)
       existing.count += 1
+      existing.quantity += rowQuantity
+      // Como viene ordenado por fecha desc, el primer ticker visto es el más reciente
+      if (!existing.ticker && rowTicker) existing.ticker = rowTicker
       if (row.transaction_date > existing.lastDate) {
         existing.lastDate = row.transaction_date
       }
@@ -75,6 +85,8 @@ export async function getPortfolioData(supabase: SupabaseClient<Database>): Prom
         total: Number(row.amount),
         count: 1,
         lastDate: row.transaction_date as string,
+        ticker: rowTicker,
+        quantity: rowQuantity,
       })
     }
   }
@@ -86,6 +98,8 @@ export async function getPortfolioData(supabase: SupabaseClient<Database>): Prom
     txCount: v.count,
     lastDate: v.lastDate,
     color: ASSET_COLORS[i % ASSET_COLORS.length],
+    ticker: v.ticker,
+    quantity: Math.round(v.quantity * 1e6) / 1e6,
   }))
 
   // Ordenar de mayor a menor
