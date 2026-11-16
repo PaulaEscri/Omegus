@@ -4,6 +4,8 @@
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-09-27",
   "compatibility_flags": ["nodejs_compat"],
+  // Guarda console.log/error del Worker (Cloudflare → Workers → omegus → Logs)
+  "observability": { "enabled": true },
   // Variables NO secretas del asistente IA. LLM_API_KEY es un secreto: vive
   // cifrada en el dashboard de Cloudflare (o `wrangler secret put LLM_API_KEY`)
   // y NO debe escribirse nunca en este archivo.

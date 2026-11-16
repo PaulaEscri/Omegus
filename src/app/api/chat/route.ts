@@ -168,7 +168,13 @@ export async function POST(req: Request) {
           return
         }
         const status = (err as { status?: number })?.status
-        console.error('[ai] chat error:', status ?? '', (err as Error)?.message)
+        // Detalle técnico solo en los logs del Worker (sin contenido del usuario)
+        console.error(
+          '[ai] chat error:',
+          status ?? 'sin-estado',
+          (err as Error)?.message,
+          JSON.stringify((err as { error?: unknown })?.error ?? null).slice(0, 800)
+        )
         send({
           type: 'error',
           message:
@@ -176,7 +182,7 @@ export async function POST(req: Request) {
               ? 'El servicio de IA está saturado. Inténtalo en un minuto.'
               : status === 401 || status === 403
                 ? 'La configuración del asistente no es válida.'
-                : 'No he podido responder. Inténtalo de nuevo.',
+                : `No he podido responder (error ${status ?? 'de conexión'} del proveedor de IA). Inténtalo de nuevo.`,
         })
       }
       controller.close()

@@ -281,7 +281,7 @@ export async function listPlaces(db: Db, a: { text?: string }) {
   return { count: data?.length ?? 0, places: data ?? [] }
 }
 
-export async function getBudgets(db: Db, cat: Catalog) {
+export async function getBudgets(db: Db, cat: Catalog, categoryFilter?: string) {
   const { data: budgets, error } = await db
     .from('budgets')
     .select('id, category_id, period, amount, currency')
@@ -292,9 +292,14 @@ export async function getBudgets(db: Db, cat: Catalog) {
   }
   if (!budgets || budgets.length === 0) return { count: 0, budgets: [] }
 
+  const wanted = categoryFilter?.trim() ? norm(categoryFilter) : null
   const periodMap: Record<string, Period> = { weekly: 'this_week', monthly: 'this_month', yearly: 'this_year' }
   const out = []
   for (const b of budgets as any[]) {
+    if (wanted) {
+      const n = b.category_id ? norm(cat.categories.find((c) => c.id === b.category_id)?.name ?? '') : 'total gastos'
+      if (!n.includes(wanted) && !wanted.includes(n)) continue
+    }
     const range = resolvePeriod(periodMap[b.period] ?? 'this_month')
     const ids = new Set<string>()
     if (b.category_id) {
@@ -328,8 +333,12 @@ export async function getBudgets(db: Db, cat: Catalog) {
   return { count: out.length, budgets: out }
 }
 
-export async function getPortfolio(db: Db) {
-  const { assets, totalInvested } = await getPortfolioData(db as any)
+export async function getPortfolio(db: Db, assetFilter?: string) {
+  const { assets: all, totalInvested } = await getPortfolioData(db as any)
+  const wanted = assetFilter?.trim() ? norm(assetFilter) : null
+  const assets = wanted
+    ? all.filter((x) => norm(x.concept).includes(wanted) || norm(x.ticker ?? '') === wanted)
+    : all
   return {
     total_invested: round2(totalInvested),
     assets: assets.slice(0, 15).map((x) => ({

@@ -50,8 +50,8 @@ const schemas = {
     limit: z.number().int().optional(),
   }),
   list_places: z.object({ text: z.string().max(80).optional() }),
-  get_budgets: z.object({}),
-  get_portfolio: z.object({}),
+  get_budgets: z.object({ category: z.string().max(80).optional() }),
+  get_portfolio: z.object({ asset: z.string().max(80).optional() }),
   propose_transaction: z.object({
     type: txType,
     amount: z.number(),
@@ -79,9 +79,16 @@ const periodProp = {
 }
 const dateProp = (d: string) => ({ type: 'string', description: `${d} (YYYY-MM-DD)` })
 
+// Algunos proveedores (Gemini en modo compatible) rechazan con 400 un objeto sin
+// propiedades (`properties: {}`) o con `required: []`. Por eso toda herramienta
+// declara al menos una propiedad (opcional) y `required` solo se envía si no está vacío.
 const fn = (name: string, description: string, properties: object, required: string[] = []): ChatCompletionTool => ({
   type: 'function',
-  function: { name, description, parameters: { type: 'object', properties, required } },
+  function: {
+    name,
+    description,
+    parameters: { type: 'object', properties, ...(required.length ? { required } : {}) },
+  },
 })
 
 export const TOOLS: ChatCompletionTool[] = [
@@ -106,8 +113,12 @@ export const TOOLS: ChatCompletionTool[] = [
     }
   ),
   fn('list_places', 'Lista los lugares guardados por el usuario.', { text: { type: 'string' } }),
-  fn('get_budgets', 'Presupuestos activos con lo gastado y lo que queda en el periodo actual.', {}),
-  fn('get_portfolio', 'Resumen de la cartera de inversión (lo invertido por activo).', {}),
+  fn('get_budgets', 'Presupuestos activos con lo gastado y lo que queda en el periodo actual.', {
+    category: { type: 'string', description: 'Filtrar por nombre de categoría (opcional)' },
+  }),
+  fn('get_portfolio', 'Resumen de la cartera de inversión (lo invertido por activo).', {
+    asset: { type: 'string', description: 'Filtrar por nombre o ticker de un activo (opcional)' },
+  }),
   fn(
     'propose_transaction',
     'PROPONE registrar un ingreso, gasto o ahorro. NO guarda: el usuario debe confirmarlo con un botón. Si falta categoría o cuenta, la herramienta lo pedirá al usuario con botones.',
@@ -167,9 +178,9 @@ export async function runTool(name: string, rawArgs: unknown, ctx: ToolContext):
       case 'list_places':
         return { result: await listPlaces(ctx.db, a) }
       case 'get_budgets':
-        return { result: await getBudgets(ctx.db, ctx.catalog) }
+        return { result: await getBudgets(ctx.db, ctx.catalog, a.category) }
       case 'get_portfolio':
-        return { result: await getPortfolio(ctx.db) }
+        return { result: await getPortfolio(ctx.db, a.asset) }
       case 'propose_transaction':
       case 'propose_place':
       case 'propose_delete_transaction': {
