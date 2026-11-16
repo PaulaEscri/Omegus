@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, PlusCircle, Clock, Settings2, PieChart } from 'lucide-react'
+import { LayoutDashboard, PlusCircle, Clock, Settings2, PieChart, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Inicio', icon: LayoutDashboard, primary: false },
   { href: '/cartera', label: 'Cartera', icon: PieChart, primary: false },
   { href: '/registro', label: 'Registrar', icon: PlusCircle, primary: true },
+  { href: '/asistente', label: 'Asistente', icon: Sparkles, primary: false },
   { href: '/historial', label: 'Historial', icon: Clock, primary: false },
   { href: '/ajustes', label: 'Ajustes', icon: Settings2, primary: false },
 ] as const

@@ -40,6 +40,10 @@ export async function middleware(request: NextRequest) {
 
   // Sin sesión → bloquear y redirigir a /login
   if (!hasSession && !isPublicRoute) {
+    // Las rutas /api devuelven 401 JSON (no una redirección HTML a /login)
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+    }
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
