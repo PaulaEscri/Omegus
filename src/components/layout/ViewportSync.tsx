@@ -2,39 +2,37 @@
 
 import { useEffect } from 'react'
 
-// Safari iOS no reduce el viewport de layout cuando aparece el teclado (dvh no
-// cambia). Este componente mide el visualViewport y expone:
-//   --vv-height        alto visible real (px)
-//   <html data-keyboard="open"> cuando el teclado está abierto
-// y desplaza el input enfocado a la zona visible. No renderiza nada.
+// Safari iOS no reduce el viewport de layout cuando aparece el teclado, así que
+// la barra inferior fija quedaría tapando/pegada al teclado. Este componente
+// marca <html data-keyboard="open"> mientras hay un campo de texto enfocado Y el
+// visualViewport se ha encogido, y el CSS (globals.css) oculta la barra.
+//
+// Deliberadamente NO hace scroll por su cuenta: Safari ya desplaza el campo
+// enfocado, y forzar scrollIntoView chocaba con los selectores nativos
+// (mes/año del calendario) y descolocaba la pantalla.
 export function ViewportSync() {
   useEffect(() => {
     const root = document.documentElement
     const vv = window.visualViewport
     if (!vv) return
 
-    const update = () => {
-      root.style.setProperty('--vv-height', `${vv.height}px`)
-      const keyboardOpen = window.innerHeight - vv.height > 120
-      if (keyboardOpen) root.dataset.keyboard = 'open'
-      else delete root.dataset.keyboard
-    }
+    const isTextField = (el: Element | null) =>
+      !!el && /^(INPUT|TEXTAREA)$/.test(el.tagName)
 
-    const onFocusIn = (e: FocusEvent) => {
-      const el = e.target as HTMLElement | null
-      if (!el || !/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return
-      // Espera a que el teclado termine de animarse
-      window.setTimeout(() => el.scrollIntoView({ block: 'center', behavior: 'smooth' }), 320)
+    const update = () => {
+      const shrunk = window.innerHeight - vv.height > 120
+      if (shrunk && isTextField(document.activeElement)) root.dataset.keyboard = 'open'
+      else delete root.dataset.keyboard
     }
 
     update()
     vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
-    document.addEventListener('focusin', onFocusIn)
+    document.addEventListener('focusin', update)
+    document.addEventListener('focusout', update)
     return () => {
       vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
-      document.removeEventListener('focusin', onFocusIn)
+      document.removeEventListener('focusin', update)
+      document.removeEventListener('focusout', update)
       delete root.dataset.keyboard
     }
   }, [])

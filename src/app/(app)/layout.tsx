@@ -11,7 +11,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex flex-col min-h-[100dvh] bg-zinc-950">
       <main
-        className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar"
+        className="flex-1 overflow-x-clip"
         style={{
           paddingTop: 'env(safe-area-inset-top, 0px)',
           paddingBottom: 'calc(4.5rem + env(safe-area-inset-bottom, 0px))',

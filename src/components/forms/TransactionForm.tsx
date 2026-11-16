@@ -338,22 +338,6 @@ export function TransactionForm({ userId, onSuccess }: TransactionFormProps) {
             aria-label="Seleccionar fecha"
             className="mt-2 rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden animate-slide-up"
           >
-            {/* Estilos para los selects nativos del dropdown */}
-            <style>{`
-              .rdp-dropdown select {
-                background: #18181b;
-                color: #e4e4e7;
-                border: 1px solid #3f3f46;
-                border-radius: 8px;
-                padding: 4px 8px;
-                font-size: 13px;
-                outline: none;
-                cursor: pointer;
-              }
-              .rdp-dropdown select:focus {
-                border-color: #8b5cf6;
-              }
-            `}</style>
             <Controller
               name="transaction_date"
               control={control}
@@ -374,24 +358,24 @@ export function TransactionForm({ userId, onSuccess }: TransactionFormProps) {
                   locale={es}
                   className="w-full"
                   classNames={{
-                    months: 'flex flex-col sm:flex-row gap-4 p-3',
+                    months: 'relative flex flex-col gap-4 p-3',
                     month_caption: 'flex justify-center pt-1 relative items-center mb-4',
-                    caption_label: 'text-sm font-semibold text-zinc-200 capitalize',
-                    dropdowns: 'flex items-center gap-2',
-                    dropdown_root: 'rdp-dropdown',
-                    nav: 'flex items-center gap-1',
+                    caption_label: 'flex items-center gap-1 text-sm font-semibold text-zinc-200 capitalize [&>svg]:size-3.5 [&>svg]:text-zinc-500',
+                    dropdowns: 'flex w-full items-center justify-center gap-2',
+                    dropdown_root: 'relative',
+                    nav: 'pointer-events-none absolute inset-x-3 top-3 z-10 flex items-center justify-between',
                     button_previous: cn(
-                      'absolute left-1 top-0 h-7 w-7 rounded-lg flex items-center justify-center',
+                      'pointer-events-auto h-7 w-7 rounded-lg flex items-center justify-center',
                       'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors'
                     ),
                     button_next: cn(
-                      'absolute right-1 top-0 h-7 w-7 rounded-lg flex items-center justify-center',
+                      'pointer-events-auto h-7 w-7 rounded-lg flex items-center justify-center',
                       'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors'
                     ),
                     weeks: 'w-full',
-                    weekdays: 'flex',
+                    weekdays: 'flex justify-between',
                     weekday: 'text-zinc-600 text-[10px] font-medium w-9 text-center uppercase',
-                    week: 'flex w-full mt-1',
+                    week: 'flex w-full justify-between mt-1',
                     day: cn(
                       'h-9 w-9 text-center text-sm p-0 relative rounded-lg',
                       'text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100',

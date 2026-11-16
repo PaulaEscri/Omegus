@@ -82,6 +82,7 @@ export function AmountInput({
         <input
           ref={inputRef}
           id="amount-input"
+          data-keep-size
           type="text"
           inputMode="decimal"
           placeholder="0.00"

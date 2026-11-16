@@ -133,9 +133,13 @@
     @apply font-sans;
     scroll-behavior: smooth;
   }
-  /* Evita zoom en inputs en iOS Safari */
-  input, select, textarea {
+  /* Evita zoom en inputs en iOS Safari: nunca por debajo de 16px.
+     Los campos con data-keep-size (p. ej. el importe, text-4xl) ya son mayores
+     y conservan su tamaño. */
+  input:not([data-keep-size]), select, textarea {
     font-size: 16px !important;
+  }
+  input, select, textarea {
     font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   }
 }
