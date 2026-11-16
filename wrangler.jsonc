@@ -4,6 +4,13 @@
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-09-27",
   "compatibility_flags": ["nodejs_compat"],
+  // Variables NO secretas del asistente IA. LLM_API_KEY es un secreto: vive
+  // cifrada en el dashboard de Cloudflare (o `wrangler secret put LLM_API_KEY`)
+  // y NO debe escribirse nunca en este archivo.
+  "vars": {
+    "LLM_BASE_URL": "https://generativelanguage.googleapis.com/v1beta/openai/",
+    "LLM_MODEL": "gemini-2.5-flash"
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
