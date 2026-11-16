@@ -17,5 +17,6 @@ Códigos que la app muestra al usuario con el formato `Error AUTH-00X: <mensaje>
 | AUTH-009 | Invitación no válida    | El enlace de invitación no es válido o ha caducado | `/invitacion` sin sesión válida (tras procesar el hash) o con `error`/`error_description` en el hash. |
 | AUTH-010 | Email ya registrado     | Ya existe una cuenta con ese email   | `inviteUser` con un email que ya existe en `profiles`. |
 | AUTH-011 | Error al invitar        | No se pudo enviar la invitación      | `inviteUserByEmail` devuelve error (límite de correos, SMTP, etc.). |
+| AUTH-013 | Demasiados intentos     | Demasiados intentos. Espera unos minutos e inténtalo de nuevo | `signInWithIdentifier` bloquea el login tras 5 intentos fallidos por usuario/email o 20 por IP en 15 minutos (tabla `auth_rate_limits`). |
 
 El detalle técnico de cada error se registra con `console.error` para depuración; la UI solo muestra el código y el mensaje de esta tabla.

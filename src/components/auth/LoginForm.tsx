@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import { reportError } from '@/lib/errors'
+import { reportError, formatError } from '@/lib/errors'
+import { signInWithIdentifier } from '@/app/(auth)/login/actions'
 import { Eye, EyeOff, Loader2, AlertCircle, ShieldCheck } from 'lucide-react'
 
 export function LoginForm() {
@@ -23,55 +23,19 @@ export function LoginForm() {
     setError('')
 
     try {
-      const supabase = createClient()
+      // La resolución usuario → email, el límite de intentos y el inicio de
+      // sesión ocurren en el servidor (server action). El email nunca llega aquí.
+      const result = await signInWithIdentifier({ identifier, password })
 
-      // Sanitización: trim + lowercase para normalizar (previene variantes de mayúsculas)
-      const cleanInput = identifier.trim().toLowerCase()
-      let targetEmail = cleanInput
-
-      // Si no contiene '@' → el usuario ha introducido un username, hay que resolver el email
-      if (!cleanInput.includes('@')) {
-        // 1ª búsqueda: por username exacto — consulta parametrizada con .eq(), nunca interpolada
-        const { data: byUsername } = await supabase
-          .from('profiles')
-          .select('email')
-          .eq('username', cleanInput)
-          .maybeSingle()
-
-        let resolvedEmail = (byUsername as { email: string } | null)?.email ?? null
-
-        // 2ª búsqueda (fallback): por prefijo de email — .ilike() es parametrizado y seguro
-        if (!resolvedEmail) {
-          const { data: byEmailPrefix } = await supabase
-            .from('profiles')
-            .select('email')
-            .ilike('email', `${cleanInput}@%`)
-            .maybeSingle()
-
-          resolvedEmail = (byEmailPrefix as { email: string } | null)?.email ?? null
-        }
-
-        if (resolvedEmail) {
-          targetEmail = resolvedEmail
-        }
-        // Si no se resuelve el email, se intenta el login con el input original.
-        // Supabase Auth devolverá error → el mensaje genérico lo cubre sin revelar nada.
-      }
-
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email: targetEmail,
-        password,
-      })
-
-      if (authError) {
-        // AUTH-002: email/usuario o contraseña incorrectos, o email sin confirmar.
-        // El detalle técnico de Supabase se registra aparte; la UI solo muestra el código.
-        setError(reportError('AUTH-002', authError))
+      if (!result.ok) {
+        // AUTH-002: credenciales incorrectas · AUTH-013: demasiados intentos
+        // El detalle técnico se registra en el servidor; la UI solo muestra el código.
+        setError(formatError(result.code))
         setLoading(false)
         return
       }
 
-      // ✅ Sesión iniciada — el middleware detectará la sesión en el siguiente request
+      // ✅ Sesión iniciada — la cookie la fija el servidor; el middleware la detectará
       router.push('/dashboard')
       router.refresh()
     } catch (err: unknown) {

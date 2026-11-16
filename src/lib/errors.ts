@@ -17,6 +17,7 @@ export type ErrorCode =
   | 'AUTH-009' // Invitación no válida — /invitacion sin sesión válida o con error en el hash
   | 'AUTH-010' // Email ya registrado — inviteUser con un email que ya existe en profiles
   | 'AUTH-011' // Error al invitar — inviteUserByEmail devuelve error
+  | 'AUTH-013' // Demasiados intentos — límite de intentos fallidos de login superado
 
 export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   'AUTH-001': 'No se pudo conectar',
@@ -31,6 +32,7 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   'AUTH-009': 'El enlace de invitación no es válido o ha caducado',
   'AUTH-010': 'Ya existe una cuenta con ese email',
   'AUTH-011': 'No se pudo enviar la invitación',
+  'AUTH-013': 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo',
 }
 
 export function formatError(code: ErrorCode): string {
