@@ -147,6 +147,24 @@
   .pl-safe  { padding-left:   env(safe-area-inset-left,   0px); }
   .pr-safe  { padding-right:  env(safe-area-inset-right,  0px); }
 
+  /* ── Cabecera sticky con notch ──
+     La página (dentro de <main>) hereda padding-top = safe-area. El margen
+     negativo lo cancela y el padding propio lo recupera: sin cambio visual al
+     inicio, pero al hacer scroll la cabecera queda pegada BAJO la barra de
+     estado en vez de debajo del notch/Dynamic Island. */
+  .app-sticky-header {
+    margin-top: calc(-1 * env(safe-area-inset-top, 0px));
+    padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+  }
+
+  /* ── Teclado virtual (iOS): oculta la barra inferior mientras se escribe ── */
+  .app-bottom-nav {
+    transition: transform 0.2s ease-out;
+  }
+  html[data-keyboard='open'] .app-bottom-nav {
+    transform: translateY(110%);
+  }
+
   /* ── Scrollbar oculto (listas móvil) ── */
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar {

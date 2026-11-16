@@ -2,11 +2,18 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getIsAdmin } from '@/lib/auth/admin'
 
-export async function injectDefinitiveStructure() {
+// Herramienta de administración: inyecta la estructura personal del propietario
+// (BBVA, Revolut, "Attara Studio"…). Solo la puede ejecutar un admin (profiles.is_admin).
+// Nunca lanza: Next oculta los mensajes lanzados en producción.
+export async function injectDefinitiveStructure(): Promise<{ ok: boolean; message: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('No autenticado')
+  if (!user) return { ok: false, message: 'No autenticado' }
+  if (!(await getIsAdmin(supabase, user.id))) {
+    return { ok: false, message: 'No autorizado' }
+  }
 
   const db = supabase as any
 

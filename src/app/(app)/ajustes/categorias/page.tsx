@@ -5,6 +5,7 @@ import { ArrowLeft, Shapes } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { CategoryManager } from '@/components/ajustes/CategoryManager'
 import type { Category } from '@/types/database'
+import { getSessionUser } from '@/lib/auth/session'
 
 export const metadata: Metadata = {
   title: 'Categorías · Ajustes',
@@ -15,7 +16,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function CategoriasPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
 
   // Cargar categorías del usuario usando el cliente de SERVIDOR para que funcione RLS
@@ -44,7 +45,7 @@ export default async function CategoriasPage() {
 
   return (
     <div className="min-h-full bg-zinc-950">
-      <header className="sticky top-0 z-10 bg-zinc-950/90 backdrop-blur-xl border-b border-zinc-800/50 px-5 py-4">
+      <header className="app-sticky-header sticky top-0 z-10 bg-zinc-950/90 backdrop-blur-xl border-b border-zinc-800/50 px-5 pb-4">
         <div className="flex items-center gap-3.5 max-w-md mx-auto">
           <Link
             href="/ajustes"

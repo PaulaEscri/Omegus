@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import { AccountManager } from '@/components/ajustes/AccountManager'
 import { ensureDefaultCashAccount } from '@/app/(app)/ajustes/ensureDefaultAccount'
 import type { Account } from '@/types/database'
+import { getSessionUser } from '@/lib/auth/session'
 
 export const metadata: Metadata = {
   title: 'Cuentas · Ajustes',
@@ -16,7 +17,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function CuentasPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
 
   // Garantiza que exista una cuenta "Efectivo" predeterminada, sin duplicarla
@@ -38,7 +39,7 @@ export default async function CuentasPage() {
 
   return (
     <div className="min-h-full bg-zinc-950">
-      <header className="sticky top-0 z-10 bg-zinc-950/90 backdrop-blur-xl border-b border-zinc-800/50 px-5 py-4">
+      <header className="app-sticky-header sticky top-0 z-10 bg-zinc-950/90 backdrop-blur-xl border-b border-zinc-800/50 px-5 pb-4">
         <div className="flex items-center gap-3.5 max-w-md mx-auto">
           <Link
             href="/ajustes"

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getPortfolioData } from '@/lib/queries/portfolio'
 import { PortfolioDonut } from '@/components/dashboard/PortfolioDonut'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { getSessionUser } from '@/lib/auth/session'
 
 export const metadata: Metadata = {
   title: 'Cartera · Finanzas',
@@ -15,7 +16,7 @@ export const dynamic = 'force-dynamic'
 // cambio
 export default async function CarteraPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
 
   let assets: Awaited<ReturnType<typeof getPortfolioData>>['assets'] = []

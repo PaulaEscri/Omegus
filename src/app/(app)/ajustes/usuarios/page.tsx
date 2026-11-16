@@ -5,6 +5,7 @@ import { ArrowLeft, Users } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getIsAdmin } from '@/lib/auth/admin'
 import { InviteUserForm } from '@/components/ajustes/InviteUserForm'
+import { getSessionUser } from '@/lib/auth/session'
 
 export const metadata: Metadata = {
   title: 'Usuarios · Ajustes',
@@ -15,7 +16,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function UsuariosPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
 
   const isAdmin = await getIsAdmin(supabase, user.id)
@@ -23,7 +24,7 @@ export default async function UsuariosPage() {
 
   return (
     <div className="min-h-full bg-zinc-950">
-      <header className="sticky top-0 z-10 bg-zinc-950/90 backdrop-blur-xl border-b border-zinc-800/50 px-5 py-4">
+      <header className="app-sticky-header sticky top-0 z-10 bg-zinc-950/90 backdrop-blur-xl border-b border-zinc-800/50 px-5 pb-4">
         <div className="flex items-center gap-3.5 max-w-md mx-auto">
           <Link
             href="/ajustes"

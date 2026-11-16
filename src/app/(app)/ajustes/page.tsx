@@ -5,6 +5,7 @@ import { Settings2, Shapes, Wallet, Users, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getIsAdmin } from '@/lib/auth/admin'
 import { cn } from '@/lib/utils'
+import { getSessionUser } from '@/lib/auth/session'
 
 export const metadata: Metadata = {
   title: 'Ajustes · Finanzas',
@@ -15,7 +16,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function AjustesPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
 
   const [{ count: categoryCount }, { count: accountCount }, isAdmin] = await Promise.all([

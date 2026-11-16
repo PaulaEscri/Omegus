@@ -26,32 +26,42 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // ⚠️ IMPORTANTE: No añadir lógica entre createServerClient y getUser.
-  // getUser() valida el token contra Supabase en cada request (no confía en la cookie local).
+  // ⚠️ IMPORTANTE: No añadir lógica entre createServerClient y getClaims.
+  // getClaims() valida la firma del JWT en local (sin ida y vuelta a Supabase
+  // en cada request) y refresca la sesión si el token ha caducado.
   const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    data: claimsData,
+  } = await supabase.auth.getClaims()
+  const claims = claimsData?.claims
+  const hasSession = !!claims?.sub
 
   const { pathname } = request.nextUrl
   const isPublicRoute = pathname === '/login' || pathname === '/invitacion'
 
   // Sin sesión → bloquear y redirigir a /login
-  if (!user && !isPublicRoute) {
+  if (!hasSession && !isPublicRoute) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
   // Invitación sin terminar (invited_at presente, sin username en metadata):
-  // cualquier otra ruta redirige a /invitacion. Solo datos de `user`, sin BD.
-  if (user && pathname !== '/invitacion' && user.invited_at && !user.user_metadata?.username) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/invitacion'
-    return NextResponse.redirect(url)
+  // cualquier otra ruta redirige a /invitacion. `invited_at` no viaja en el JWT,
+  // así que solo se consulta a Auth (getUser) cuando el JWT no trae username:
+  // usuarios con perfil completo no pagan esa llamada.
+  if (hasSession && pathname !== '/invitacion' && !claims?.user_metadata?.username) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (user?.invited_at && !user.user_metadata?.username) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/invitacion'
+      return NextResponse.redirect(url)
+    }
   }
 
   // Con sesión en /login → redirigir al dashboard
-  if (user && pathname === '/login') {
+  if (hasSession && pathname === '/login') {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
@@ -59,8 +69,8 @@ export async function middleware(request: NextRequest) {
 
   // /signup solo accesible por el admin (ya hay sesión garantizada arriba).
   // Consulta a profiles solo en esta ruta, para no añadirla en cada request.
-  if (user && pathname.startsWith('/signup')) {
-    const isAdmin = await getIsAdmin(supabase, user.id)
+  if (hasSession && claims?.sub && pathname.startsWith('/signup')) {
+    const isAdmin = await getIsAdmin(supabase, claims.sub)
     if (!isAdmin) {
       const url = request.nextUrl.clone()
       url.pathname = '/dashboard'

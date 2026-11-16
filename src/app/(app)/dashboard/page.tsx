@@ -12,6 +12,7 @@ import { CashbackChart } from '@/components/dashboard/CashbackChart'
 import { Patrimonio } from '@/components/dashboard/Patrimonio'
 import { LogoutButton } from '@/components/auth/LogoutButton'
 import { formatCurrency } from '@/lib/utils'
+import { getSessionUser } from '@/lib/auth/session'
 
 
 export const metadata: Metadata = {
@@ -24,7 +25,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getSessionUser()
   if (!user) redirect('/login')
 
   const now = new Date()
