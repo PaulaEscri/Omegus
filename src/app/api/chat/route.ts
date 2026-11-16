@@ -118,11 +118,19 @@ export async function POST(req: Request) {
               send({ type: 'text', delta: delta.content })
             }
             for (const tc of delta.tool_calls ?? []) {
-              const cur = calls.get(tc.index) ?? { id: '', name: '', args: '' }
+              // Algunos proveedores (p. ej. Gemini en modo compatible) omiten `index`:
+              // un fragmento con nombre abre una llamada nueva; el resto continúa la última.
+              const idx =
+                typeof tc.index === 'number'
+                  ? tc.index
+                  : tc.function?.name
+                    ? calls.size
+                    : Math.max(calls.size - 1, 0)
+              const cur = calls.get(idx) ?? { id: '', name: '', args: '' }
               if (tc.id) cur.id = tc.id
               if (tc.function?.name) cur.name += tc.function.name
               if (tc.function?.arguments) cur.args += tc.function.arguments
-              calls.set(tc.index, cur)
+              calls.set(idx, cur)
             }
           }
 
