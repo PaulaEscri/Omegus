@@ -443,19 +443,29 @@ export async function proposeTransaction(
   const subcategory_id = category!.parent_id ? category!.id : null
   const parentName = category!.parent_id ? cat.categories.find((c) => c.id === category!.parent_id)?.name : null
 
-  // Lugar (opcional): si existe en la tabla places se enlaza; si no, queda en notas
+  // Lugar (opcional), se guarda en transactions.place_id:
+  //  - si ya existe en places → se enlaza su id
+  //  - si es nuevo → se crea AL CONFIRMAR (place_name) y se enlaza; la IA no escribe
+  //  - si la tabla places no responde → respaldo: queda anotado en las notas
   let place_id: string | null = null
-  let placeName: string | null = null
+  let place_name: string | null = null
+  let placeLabel: string | null = null
   let notes = a.notes?.trim() || ''
   if (a.place?.trim()) {
+    const wanted = a.place.trim().slice(0, 120)
     const { data, error } = await db.from('places').select('id, name').eq('is_active', true)
-    const m = error ? { match: null } : matchByName((data as any[]) ?? [], a.place)
-    if (m.match) {
-      place_id = (m.match as any).id
-      placeName = (m.match as any).name
+    if (error) {
+      placeLabel = wanted
+      notes = [notes, `Lugar: ${wanted}`].filter(Boolean).join(' · ')
     } else {
-      placeName = a.place.trim()
-      notes = [notes, `Lugar: ${placeName}`].filter(Boolean).join(' · ')
+      const m = matchByName((data as any[]) ?? [], wanted)
+      if (m.match) {
+        place_id = (m.match as any).id
+        placeLabel = (m.match as any).name
+      } else {
+        place_name = wanted
+        placeLabel = `${wanted} (nuevo)`
+      }
     }
   }
 
@@ -471,6 +481,7 @@ export async function proposeTransaction(
     notes: notes ? notes.slice(0, 500) : null,
     transaction_date: date,
     place_id,
+    place_name,
     ticker: a.ticker?.trim() ? a.ticker.trim().toUpperCase().slice(0, 15) : null,
     quantity: a.quantity && a.quantity > 0 ? a.quantity : null,
   }
@@ -483,7 +494,7 @@ export async function proposeTransaction(
     { label: 'Cuenta', value: dest ? `${account!.name} → ${dest.name}` : account!.name },
     { label: 'Fecha', value: date },
   ]
-  if (placeName) lines.push({ label: 'Lugar', value: placeName })
+  if (placeLabel) lines.push({ label: 'Lugar', value: placeLabel })
 
   const token = await signAction('create_transaction', userId, payload)
   return {
@@ -583,9 +594,32 @@ const txPayload = z.object({
   notes: z.string().max(500).nullable(),
   transaction_date: z.string().regex(ISO_DATE),
   place_id: z.string().uuid().nullable(),
+  place_name: z.string().min(1).max(120).nullish(),
   ticker: z.string().max(15).nullable(),
   quantity: z.number().positive().nullable(),
 })
+
+// Devuelve el id de un lugar por nombre; lo crea si no existe. Idempotente: el
+// índice único (user_id, lower(btrim(name))) evita duplicados aunque se repita.
+async function ensurePlace(db: Db, userId: string, name: string): Promise<string | null> {
+  const lookup = async () => {
+    const { data, error } = await db.from('places').select('id, name, is_active')
+    if (error) return null
+    return ((data as any[]) ?? []).find((p) => norm(p.name) === norm(name)) ?? null
+  }
+
+  const existing = await lookup()
+  if (existing) {
+    if (!existing.is_active) await db.from('places').update({ is_active: true }).eq('id', existing.id)
+    return existing.id as string
+  }
+
+  const { data, error } = await db.from('places').insert({ user_id: userId, name }).select('id').single()
+  if (!error && data) return (data as any).id as string
+  if (error?.code === '23505') return ((await lookup())?.id as string | undefined) ?? null
+  console.error('[ai] ensurePlace:', error?.message)
+  return null
+}
 
 export type ExecResult = { ok: true; message: string } | { ok: false; message: string }
 
@@ -608,6 +642,9 @@ export async function executeAction(db: Db, userId: string, p: ActionPayload): P
     if (d.place_id) {
       const pl = await db.from('places').select('id').eq('id', d.place_id).maybeSingle()
       if (!pl.data) d.place_id = null
+    }
+    if (!d.place_id && d.place_name) {
+      d.place_id = await ensurePlace(db, userId, d.place_name)
     }
 
     const row: Record<string, unknown> = {
