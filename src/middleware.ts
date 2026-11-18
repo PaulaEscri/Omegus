@@ -36,6 +36,16 @@ export async function middleware(request: NextRequest) {
   const hasSession = !!claims?.sub
 
   const { pathname } = request.nextUrl
+
+  // Enlace de invitación/recuperación por defecto de Supabase: llega a la raíz
+  // como /?type=invite&token_hash=... Se reenvía (con sus parámetros) al callback,
+  // que valida el token y lleva a /set-password, antes de aplicar la lógica de login.
+  const sp = request.nextUrl.searchParams
+  if (pathname === '/' && sp.get('token_hash') && sp.get('type')) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/auth/callback'
+    return NextResponse.redirect(url)
+  }
   const isPublicRoute = pathname === '/login' ||
     pathname === '/set-password' ||
     pathname === '/invitacion' ||
