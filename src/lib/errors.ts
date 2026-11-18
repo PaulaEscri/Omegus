@@ -14,7 +14,7 @@ export type ErrorCode =
   | 'AUTH-006' // Contraseñas distintas — validación de cliente al crear cuenta
   | 'AUTH-007' // Solo admin — createUserAsAdmin/inviteUser invocada por alguien sin profiles.is_admin
   | 'AUTH-008' // Usuario en uso — el username normalizado ya existe en profiles
-  | 'AUTH-009' // Invitación no válida — /invitacion sin sesión válida o con error en el hash
+  | 'AUTH-009' // Invitación no válida — /set-password sin sesión válida o con error en el hash
   | 'AUTH-010' // Email ya registrado — inviteUser con un email que ya existe en profiles
   | 'AUTH-011' // Error al invitar — inviteUserByEmail devuelve error
   | 'AUTH-013' // Demasiados intentos — límite de intentos fallidos de login superado

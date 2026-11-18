@@ -14,7 +14,7 @@ Códigos que la app muestra al usuario con el formato `Error AUTH-00X: <mensaje>
 | AUTH-006 | Contraseñas distintas   | Las contraseñas no coinciden         | Validación en el cliente al crear cuenta o completar una invitación, antes de llamar a la server action. |
 | AUTH-007 | Solo admin              | No tienes permiso para crear cuentas | `createUserAsAdmin` / `inviteUser` invocada por un usuario sin `profiles.is_admin`. |
 | AUTH-008 | Usuario en uso          | Ese nombre de usuario ya existe      | El `username` normalizado (trim + minúsculas) ya existe en `profiles`. |
-| AUTH-009 | Invitación no válida    | El enlace de invitación no es válido o ha caducado | `/invitacion` sin sesión válida (tras procesar el hash) o con `error`/`error_description` en el hash. |
+| AUTH-009 | Invitación no válida    | El enlace de invitación no es válido o ha caducado | `/set-password` sin sesión válida (tras procesar el hash) o con `error`/`error_description` en el hash. |
 | AUTH-010 | Email ya registrado     | Ya existe una cuenta con ese email   | `inviteUser` con un email que ya existe en `profiles`. |
 | AUTH-011 | Error al invitar        | No se pudo enviar la invitación      | `inviteUserByEmail` devuelve error (límite de correos, SMTP, etc.). |
 | AUTH-013 | Demasiados intentos     | Demasiados intentos. Espera unos minutos e inténtalo de nuevo | `signInWithIdentifier` bloquea el login tras 5 intentos fallidos por usuario/email o 20 por IP en 15 minutos (tabla `auth_rate_limits`). |

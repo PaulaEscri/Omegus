@@ -36,7 +36,10 @@ export async function middleware(request: NextRequest) {
   const hasSession = !!claims?.sub
 
   const { pathname } = request.nextUrl
-  const isPublicRoute = pathname === '/login' || pathname === '/invitacion'
+  const isPublicRoute = pathname === '/login' ||
+    pathname === '/set-password' ||
+    pathname === '/invitacion' ||
+    pathname === '/auth/callback'
 
   // Sin sesión → bloquear y redirigir a /login
   if (!hasSession && !isPublicRoute) {
@@ -50,16 +53,16 @@ export async function middleware(request: NextRequest) {
   }
 
   // Invitación sin terminar (invited_at presente, sin username en metadata):
-  // cualquier otra ruta redirige a /invitacion. `invited_at` no viaja en el JWT,
+  // cualquier otra ruta redirige a /set-password. `invited_at` no viaja en el JWT,
   // así que solo se consulta a Auth (getUser) cuando el JWT no trae username:
   // usuarios con perfil completo no pagan esa llamada.
-  if (hasSession && pathname !== '/invitacion' && !claims?.user_metadata?.username) {
+  if (hasSession && pathname !== '/set-password' && pathname !== '/invitacion' && !claims?.user_metadata?.username) {
     const {
       data: { user },
     } = await supabase.auth.getUser()
     if (user?.invited_at && !user.user_metadata?.username) {
       const url = request.nextUrl.clone()
-      url.pathname = '/invitacion'
+      url.pathname = '/set-password'
       return NextResponse.redirect(url)
     }
   }

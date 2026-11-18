@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { reportError } from '@/lib/errors'
-import { acceptInvitation } from '@/app/(auth)/invitacion/actions'
+import { acceptInvitation } from '@/app/(auth)/set-password/actions'
 import { Eye, EyeOff, Loader2, AlertCircle, Mail } from 'lucide-react'
 
 type Phase = 'loading' | 'ready' | 'invalid'
@@ -60,7 +60,7 @@ export function InvitationForm() {
       }
 
       if (user.user_metadata?.username) {
-        router.replace('/dashboard')
+        router.replace('/')
         return
       }
 
@@ -96,7 +96,7 @@ export function InvitationForm() {
       return
     }
 
-    router.replace('/dashboard')
+    router.replace('/')
     router.refresh()
   }
 

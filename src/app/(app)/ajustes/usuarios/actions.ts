@@ -31,7 +31,7 @@ export async function inviteUser(rawEmail: string): Promise<InviteUserResult> {
     }
 
     const { error } = await adminClient.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/invitacion`,
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
     })
 
     if (error) {
