@@ -13,6 +13,8 @@ import { Patrimonio } from '@/components/dashboard/Patrimonio'
 import { LogoutButton } from '@/components/auth/LogoutButton'
 import { formatCurrency } from '@/lib/utils'
 import { getSessionUser } from '@/lib/auth/session'
+import { isBankSyncDue } from '@/lib/bank/sync'
+import { BankAutoSync } from '@/components/dashboard/BankAutoSync'
 
 
 export const metadata: Metadata = {
@@ -32,6 +34,9 @@ export default async function DashboardPage() {
   const monthLabel = now.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
 
   // Fetch data — silenciar errores si Supabase no está configurado aún
+  // Se lanza en paralelo con el resto de consultas
+  const bankDuePromise = isBankSyncDue(supabase)
+
   let chartData = [] as Awaited<ReturnType<typeof getDashboardData>>['chartData']
   let summary = { income: 0, expenses: 0, savings: 0, cashback: 0, balance: 0 }
   let accounts = [] as Awaited<ReturnType<typeof getAccountBalances>>
@@ -48,6 +53,7 @@ export default async function DashboardPage() {
     console.error('Dashboard data error:', err)
   }
 
+  const bankDue = await bankDuePromise
   const totalCashback = chartData.reduce((s, d) => s + d.cashback, 0)
 
   const stats = [
@@ -79,6 +85,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-full bg-zinc-950">
+      {bankDue && <BankAutoSync />}
       <div className="px-5 pt-8 pb-4 max-w-md mx-auto space-y-7">
 
         {/* ── HEADER ────────────────────────────────────────── */}

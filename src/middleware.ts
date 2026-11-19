@@ -48,7 +48,9 @@ export async function middleware(request: NextRequest) {
   const isPublicRoute = pathname === '/login' ||
     pathname === '/register' ||
     pathname === '/set-password' ||
-    pathname === '/auth/callback'
+    pathname === '/auth/callback' ||
+    pathname === '/privacy' ||
+    pathname === '/terms'
 
   // Sin sesión → bloquear y redirigir a /login
   if (!hasSession && !isPublicRoute) {

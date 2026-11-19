@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/server'
 import { getIsAdmin } from '@/lib/auth/admin'
 import { cn } from '@/lib/utils'
 import { getSessionUser } from '@/lib/auth/session'
+import { isBankingConfigured } from '@/lib/bank/enableBanking'
+import { BankConnections, type BankGroup } from '@/components/ajustes/BankConnections'
 
 export const metadata: Metadata = {
   title: 'Ajustes · Finanzas',
@@ -14,16 +16,54 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic'
 
-export default async function AjustesPage() {
+export default async function AjustesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ bank?: string; reason?: string }>
+}) {
+  const { bank, reason } = await searchParams
   const supabase = await createClient()
   const user = await getSessionUser()
   if (!user) redirect('/login')
 
-  const [{ count: categoryCount }, { count: accountCount }, isAdmin] = await Promise.all([
+  const [{ count: categoryCount }, { count: accountCount }, isAdmin, bankRes, accountsRes] = await Promise.all([
     supabase.from('categories').select('id', { count: 'exact', head: true }).eq('is_active', true),
     supabase.from('accounts').select('id', { count: 'exact', head: true }).eq('is_active', true),
     getIsAdmin(supabase, user.id),
+    // Si la migración de bancos aún no se ha ejecutado, devuelve error y la sección sale vacía
+    supabase
+      .from('bank_connections' as never)
+      .select('id, session_id, bank_name, iban_masked, expires_at, last_synced_at, last_error')
+      .order('created_at'),
+    supabase.from('accounts').select('id, name').eq('is_active', true).order('sort_order'),
   ])
+
+  // Una tarjeta por sesión bancaria (una sesión puede incluir varias cuentas)
+  const bankRows = ((bankRes.data ?? []) as unknown as {
+    id: string; session_id: string; bank_name: string; iban_masked: string | null
+    expires_at: string; last_synced_at: string | null; last_error: string | null
+  }[])
+  const bankMap = new Map<string, BankGroup>()
+  for (const r of bankRows) {
+    const g = bankMap.get(r.session_id)
+    if (!g) {
+      bankMap.set(r.session_id, {
+        id: r.id,
+        bankName: r.bank_name,
+        ibans: r.iban_masked ? [r.iban_masked] : [],
+        expiresAt: r.expires_at,
+        lastSyncedAt: r.last_synced_at,
+        lastError: r.last_error,
+      })
+    } else {
+      if (r.iban_masked) g.ibans.push(r.iban_masked)
+      if (r.expires_at < g.expiresAt) g.expiresAt = r.expires_at
+      if (r.last_synced_at && (!g.lastSyncedAt || r.last_synced_at < g.lastSyncedAt)) g.lastSyncedAt = r.last_synced_at
+      g.lastError = g.lastError ?? r.last_error
+    }
+  }
+  const bankGroups = [...bankMap.values()]
+  const accountOptions = ((accountsRes.data ?? []) as { id: string; name: string }[])
 
   const menuItems = [
     {
@@ -95,6 +135,15 @@ export default async function AjustesPage() {
             </Link>
           ))}
         </nav>
+
+        {/* ── BANCOS CONECTADOS ─────────────────────────────── */}
+        <BankConnections
+          configured={isBankingConfigured()}
+          groups={bankGroups}
+          accounts={accountOptions}
+          status={bank ?? null}
+          reason={reason ?? null}
+        />
 
       </div>
     </div>
