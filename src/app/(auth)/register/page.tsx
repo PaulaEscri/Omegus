@@ -43,7 +43,7 @@ export default function RegisterPage() {
             Crea tu cuenta
           </h2>
           <p className="text-sm text-zinc-500 mb-6">
-            Introduce tu email y elige una contraseña
+            Elige tu usuario, email y contraseña
           </p>
 
           <RegisterForm />

@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import { reportError } from '@/lib/errors'
+import { reportError, formatError } from '@/lib/errors'
+import { registerUser } from '@/app/(auth)/register/actions'
 import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react'
 
 const inputClass = cn(
@@ -18,6 +18,7 @@ const labelClass =
 
 export function RegisterForm() {
   const router = useRouter()
+  const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -29,6 +30,10 @@ export function RegisterForm() {
     e.preventDefault()
     setError('')
 
+    if (!username.trim()) {
+      setError(reportError('AUTH-004'))
+      return
+    }
     if (password !== confirmPassword) {
       setError(reportError('AUTH-006'))
       return
@@ -40,25 +45,10 @@ export function RegisterForm() {
 
     setLoading(true)
     try {
-      const supabase = createClient()
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
-        password,
-      })
+      const result = await registerUser({ username, email, password })
 
-      if (signUpError) {
-        const code = (signUpError as { code?: string }).code
-        if (code === 'user_already_exists') setError(reportError('AUTH-010'))
-        else if (code === 'weak_password') setError(reportError('AUTH-012'))
-        else setError(reportError('AUTH-003', signUpError))
-        setLoading(false)
-        return
-      }
-
-      // Sin confirmación por correo, signUp devuelve sesión. Si no la hay
-      // (confirmación activada o email ya existente), no se puede entrar.
-      if (!data.session) {
-        setError(reportError('AUTH-003', 'signUp sin sesión'))
+      if (!result.ok) {
+        setError(formatError(result.code))
         setLoading(false)
         return
       }
@@ -73,6 +63,23 @@ export function RegisterForm() {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
+      <div className="space-y-1.5">
+        <label htmlFor="register-username" className={labelClass}>Usuario</label>
+        <input
+          id="register-username"
+          type="text"
+          autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="peufeliz"
+          required
+          disabled={loading}
+          className={inputClass}
+        />
+      </div>
+
       <div className="space-y-1.5">
         <label htmlFor="register-email" className={labelClass}>Email</label>
         <input
@@ -145,7 +152,7 @@ export function RegisterForm() {
 
       <button
         type="submit"
-        disabled={loading || !email || !password || !confirmPassword}
+        disabled={loading || !username || !email || !password || !confirmPassword}
         className={cn(
           'w-full h-14 rounded-2xl text-base font-bold tracking-tight',
           'bg-violet-600 text-white transition-all duration-200 active:scale-[0.98]',
