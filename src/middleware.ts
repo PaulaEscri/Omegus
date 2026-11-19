@@ -47,6 +47,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
   const isPublicRoute = pathname === '/login' ||
+    pathname === '/register' ||
     pathname === '/set-password' ||
     pathname === '/invitacion' ||
     pathname === '/auth/callback'
