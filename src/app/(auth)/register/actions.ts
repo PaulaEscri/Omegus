@@ -56,17 +56,28 @@ export async function registerUser(input: RegisterInput): Promise<RegisterResult
       return { ok: false, code: 'AUTH-003' }
     }
 
-    // Garantiza profiles.username aunque el trigger de alta no copie el metadata
+    // Garantiza profiles.username (trazabilidad) aunque el trigger de alta no lo
+    // copie del metadata; si la fila de perfil no existe todavía, la crea.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: profileError } = await (adminClient as any)
-      .from('profiles')
+    const profiles = (adminClient as any).from('profiles')
+    const { data: updated, error: updateError } = await profiles
       .update({ username })
       .eq('id', data.user.id)
+      .select('id')
 
-    if (profileError) {
-      reportError('AUTH-003', profileError)
-      return { ok: false, code: 'AUTH-003' }
+    let saved = !updateError && Array.isArray(updated) && updated.length > 0
+    if (!saved && !updateError) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: insertError } = await (adminClient as any)
+        .from('profiles')
+        .insert({ id: data.user.id, email, username })
+      saved = !insertError
+      if (insertError) reportError('AUTH-003', insertError)
+    } else if (updateError) {
+      reportError('AUTH-003', updateError)
     }
+
+    if (!saved) return { ok: false, code: 'AUTH-003' }
 
     return { ok: true }
   } catch (err: unknown) {
