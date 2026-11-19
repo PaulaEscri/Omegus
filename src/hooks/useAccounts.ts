@@ -10,6 +10,7 @@ export function useAccounts() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true)
     getAccounts()
       .then(setAccounts)

@@ -5,7 +5,6 @@ import { useForm, Controller, type SubmitHandler } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format, subDays, subWeeks, subMonths } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   CalendarIcon,
@@ -82,7 +81,6 @@ function AccountChip({
 
 // ── Componente ───────────────────────────────────────────────
 export function TransactionForm({ userId, onSuccess }: TransactionFormProps) {
-  const router = useRouter()
   const [showCalendar, setShowCalendar] = useState(false)
   const [submitState, setSubmitState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')

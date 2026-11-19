@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 // Lee profiles.is_admin del usuario indicado. Devuelve false si no hay fila

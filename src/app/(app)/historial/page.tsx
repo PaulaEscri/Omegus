@@ -92,7 +92,6 @@ export default function HistorialPage() {
     if (isCurrentMonth) return
     setSelectedMonth((d) => startOfMonth(addMonths(d, 1)))
   }
-  const goToCurrentMonth = () => setSelectedMonth(currentMonthStart)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -112,6 +111,7 @@ export default function HistorialPage() {
     }
   }, [tab, selectedMonth])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchData() }, [fetchData])
 
   const handleDelete = async () => {
@@ -459,7 +459,7 @@ export default function HistorialPage() {
               {/* Notas */}
               {selectedTx.notes && (
                 <p className="text-sm text-zinc-500 italic mb-5 px-1">
-                  "{selectedTx.notes}"
+                  &quot;{selectedTx.notes}&quot;
                 </p>
               )}
 

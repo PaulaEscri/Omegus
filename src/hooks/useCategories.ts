@@ -12,6 +12,7 @@ export function useCategories(transactionType: string) {
   useEffect(() => {
     if (!transactionType) return
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true)
     setError(null)
 

@@ -29,6 +29,7 @@ export function AssetCombobox({ value, onChange, error }: AssetComboboxProps) {
   // Filtrar sugerencias cuando cambia el query
   useEffect(() => {
     if (!query.trim()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSuggestions(allConcepts.slice(0, 8))
     } else {
       const q = query.toLowerCase()

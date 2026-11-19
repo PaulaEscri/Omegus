@@ -70,32 +70,6 @@ export interface Transaction {
   destination_account?: Pick<Account, 'id' | 'name' | 'color' | 'icon' | 'type'>
 }
 
-export interface TransactionFormData {
-  type: TransactionType
-  amount: number
-  currency: string
-  category_id: string
-  subcategory_id?: string
-  account_id: string
-  destination_account_id?: string
-  concept: string
-  ticker?: string
-  quantity?: number
-  notes?: string
-  transaction_date: Date
-  is_recurring: boolean
-  tags?: string[]
-}
-
-export interface AccountFormData {
-  name: string
-  type: AccountType
-  currency: string
-  color: string
-  icon: string
-  sort_order: number
-}
-
 export interface MonthlySummary {
   user_id: string
   month: string
@@ -165,31 +139,3 @@ export type Database = {
     }
   }
 }
-
-export interface HistoryFilter {
-  type: TransactionType | 'all'
-  period: 'current_month' | 'last_month' | 'custom'
-  dateFrom?: string
-  dateTo?: string
-  category_id?: string
-  account_id?: string
-}
-
-export interface WealthSummary {
-  total_liquid: number
-  total_invested: number
-  total_net: number
-  accounts: AccountBalance[]
-}
-
-export interface DashboardSummary {
-  month: string
-  income: number
-  expenses: number
-  savings: number
-  cashback: number
-  balance: number
-  savings_rate: number
-}
-
-export type HistoryViewMode = 'list' | 'pie' | 'bar'

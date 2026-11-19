@@ -1,6 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { getIsAdmin } from '@/lib/auth/admin'
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -49,7 +48,6 @@ export async function middleware(request: NextRequest) {
   const isPublicRoute = pathname === '/login' ||
     pathname === '/register' ||
     pathname === '/set-password' ||
-    pathname === '/invitacion' ||
     pathname === '/auth/callback'
 
   // Sin sesión → bloquear y redirigir a /login
@@ -67,7 +65,7 @@ export async function middleware(request: NextRequest) {
   // cualquier otra ruta redirige a /set-password. `invited_at` no viaja en el JWT,
   // así que solo se consulta a Auth (getUser) cuando el JWT no trae username:
   // usuarios con perfil completo no pagan esa llamada.
-  if (hasSession && pathname !== '/set-password' && pathname !== '/invitacion' && !claims?.user_metadata?.username) {
+  if (hasSession && pathname !== '/set-password' && !claims?.user_metadata?.username) {
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -83,17 +81,6 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
-  }
-
-  // /signup solo accesible por el admin (ya hay sesión garantizada arriba).
-  // Consulta a profiles solo en esta ruta, para no añadirla en cada request.
-  if (hasSession && claims?.sub && pathname.startsWith('/signup')) {
-    const isAdmin = await getIsAdmin(supabase, claims.sub)
-    if (!isAdmin) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/dashboard'
-      return NextResponse.redirect(url)
-    }
   }
 
   return supabaseResponse

@@ -54,7 +54,9 @@ export async function getTransactions(params: {
   let query = (supabase.from('transactions') as any)
     .select(
       `
-      *,
+      id, type, amount, currency, category_id, subcategory_id, account_id,
+      destination_account_id, concept, ticker, quantity, notes, transaction_date,
+      is_recurring, tags,
       category:categories!category_id(id, name, color, icon, is_cashback),
       subcategory:categories!subcategory_id(id, name, color, icon),
       account:accounts!account_id(id, name, color, icon, type),
@@ -78,35 +80,6 @@ export async function getTransactions(params: {
   const { data, error, count } = await query
   if (error) throw error
   return { data: (data as Transaction[]) ?? [], count: (count as number) ?? 0 }
-}
-
-// ── Actualizar una transacción ──────────────────────────────
-export async function updateTransaction(
-  id: string,
-  formData: Partial<TransactionSchema>
-): Promise<Transaction> {
-  const supabase = createClient()
-
-  const updatePayload: Record<string, unknown> = { ...formData }
-  if (formData.transaction_date) {
-    updatePayload.transaction_date = format(formData.transaction_date, 'yyyy-MM-dd')
-  }
-  // Limpiar el campo Date original si quedó
-  delete updatePayload.transaction_date
-
-  if (formData.transaction_date) {
-    updatePayload.transaction_date = format(formData.transaction_date, 'yyyy-MM-dd')
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from('transactions') as any)
-    .update(updatePayload)
-    .eq('id', id)
-    .select('*')
-    .single()
-
-  if (error) throw error
-  return data as Transaction
 }
 
 // ── Eliminar una transacción ────────────────────────────────

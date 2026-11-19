@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import {
   TrendingUp, TrendingDown, PiggyBank, Sparkles,
-  PlusCircle, Clock, LogOut,
+  PlusCircle, Clock,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getDashboardData, getAccountBalances } from '@/lib/queries/dashboard'
@@ -37,10 +37,13 @@ export default async function DashboardPage() {
   let accounts = [] as Awaited<ReturnType<typeof getAccountBalances>>
 
   try {
-    const result = await getDashboardData(supabase)
+    const [result, balances] = await Promise.all([
+      getDashboardData(supabase),
+      getAccountBalances(supabase),
+    ])
     chartData = result.chartData
     summary = result.summary
-    accounts = await getAccountBalances(supabase)
+    accounts = balances
   } catch (err) {
     console.error('Dashboard data error:', err)
   }

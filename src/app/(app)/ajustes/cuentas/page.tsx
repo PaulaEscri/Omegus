@@ -27,7 +27,7 @@ export default async function CuentasPage() {
 
     const { data, error } = await supabase
       .from('accounts')
-      .select('*')
+      .select('id, name, type, currency, color, icon, is_active, sort_order')
       .eq('is_active', true)
       .order('sort_order')
 

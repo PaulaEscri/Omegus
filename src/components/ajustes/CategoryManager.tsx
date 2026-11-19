@@ -22,7 +22,6 @@ const ICON_OPTIONS = [
 
 type Props = {
   initialCategories: Category[]
-  userId: string
 }
 
 const TYPE_LABELS: Record<TransactionType, string> = {
@@ -50,7 +49,7 @@ type FormState = {
   defaultType?: TransactionType
 }
 
-export function CategoryManager({ initialCategories, userId }: Props) {
+export function CategoryManager({ initialCategories }: Props) {
   const [categories, setCategories] = useState<Category[]>(initialCategories)
   const [expanded, setExpanded] = useState<TransactionType | null>('expense')
   const [expandedRoots, setExpandedRoots] = useState<Record<string, boolean>>({})
@@ -66,7 +65,6 @@ export function CategoryManager({ initialCategories, userId }: Props) {
   const [formIsCashback, setFormIsCashback] = useState(false)
   const [formIsInvestment, setFormIsInvestment] = useState(false)
   const [formError, setFormError] = useState('')
-  const [formSuccess, setFormSuccess] = useState(false)
   
   const [isPending, startTransition] = useTransition()
 
@@ -86,7 +84,6 @@ export function CategoryManager({ initialCategories, userId }: Props) {
   const openForm = (state: FormState, cat?: Category) => {
     setFormState(state)
     setFormError('')
-    setFormSuccess(false)
     if (state.mode === 'edit' && cat) {
       setFormType(cat.transaction_type)
       setFormName(cat.name)
@@ -97,6 +94,7 @@ export function CategoryManager({ initialCategories, userId }: Props) {
     } else {
       setFormType(state.defaultType ?? 'expense')
       setFormName('')
+      // eslint-disable-next-line react-hooks/purity
       setFormColor(COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)])
       setFormIcon(ICON_OPTIONS[0])
       setFormIsCashback(false)
@@ -179,6 +177,7 @@ export function CategoryManager({ initialCategories, userId }: Props) {
         // Para simplificar, recargamos la página entera para tener el árbol actualizado real
         // ya que la actualización optimista de árboles anidados es propensa a errores
         window.location.reload()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } catch (err: any) {
         setFormError(err.message ?? 'Error al guardar')
       }

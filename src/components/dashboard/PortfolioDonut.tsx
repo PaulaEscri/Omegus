@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
@@ -20,20 +21,6 @@ function CustomTooltip({ active, payload }: any) {
       <p className="text-zinc-300">{formatCurrency(item.totalInvested)}</p>
       <p className="text-zinc-500">{pct}% del total</p>
     </div>
-  )
-}
-
-// Label personalizado dentro del donut
-function CenterLabel({ cx, cy, totalInvested }: { cx: number; cy: number; totalInvested: number }) {
-  return (
-    <g>
-      <text x={cx} y={cy - 10} textAnchor="middle" fill="#e4e4e7" fontSize={13} fontWeight={600}>
-        Total
-      </text>
-      <text x={cx} y={cy + 12} textAnchor="middle" fill="#a78bfa" fontSize={16} fontWeight={700}>
-        {formatCurrency(totalInvested)}
-      </text>
-    </g>
   )
 }
 

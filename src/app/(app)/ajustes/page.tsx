@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Settings2, Shapes, Wallet, Users, ShieldCheck, ChevronRight } from 'lucide-react'
+import { Settings2, Shapes, Wallet, ShieldCheck, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getIsAdmin } from '@/lib/auth/admin'
 import { cn } from '@/lib/utils'
@@ -44,14 +44,6 @@ export default async function AjustesPage() {
     },
     ...(isAdmin
       ? [
-          {
-            href: '/ajustes/usuarios',
-            label: 'Usuarios',
-            description: 'Invitar nuevas cuentas',
-            icon: Users,
-            color: 'text-blue-400',
-            bg: 'bg-blue-500/15',
-          },
           {
             href: '/admin',
             label: 'Panel de Admin',

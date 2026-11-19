@@ -1,8 +1,6 @@
-// SOLO SERVIDOR: combina getPortfolioData con precios de mercado reales.
+// SOLO SERVIDOR: combina el portfolio con precios de mercado reales.
 // No importar desde componentes 'use client'.
-import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database } from '@/types/database'
-import { getPortfolioData, type PortfolioAsset } from './portfolio'
+import type { PortfolioAsset } from './portfolio'
 import { getStockPrices } from '@/lib/stockPrice'
 
 export interface PortfolioAssetWithMarket extends PortfolioAsset {
@@ -61,14 +59,4 @@ export function applyMarketPrices(
     totalMarketValue: Math.round(totalMarketValue * 100) / 100,
     allHaveMarketData,
   }
-}
-
-// Versión bloqueante (espera a los precios). La página de Cartera usa en su
-// lugar fetchPortfolioPrices + applyMarketPrices para hacer streaming.
-export async function getPortfolioWithMarketValues(
-  supabase: SupabaseClient<Database>
-): Promise<PortfolioWithMarket> {
-  const { assets, totalInvested } = await getPortfolioData(supabase)
-  const prices = await fetchPortfolioPrices(assets)
-  return applyMarketPrices(assets, totalInvested, prices)
 }

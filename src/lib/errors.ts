@@ -16,7 +16,6 @@ export type ErrorCode =
   | 'AUTH-008' // Usuario en uso — el username normalizado ya existe en profiles
   | 'AUTH-009' // Invitación no válida — /set-password sin sesión válida o con error en el hash
   | 'AUTH-010' // Email ya registrado — inviteUser con un email que ya existe en profiles
-  | 'AUTH-011' // Error al invitar — inviteUserByEmail devuelve error
   | 'AUTH-014' // Usuario no encontrado — el id objetivo del panel de admin no existe en profiles
   | 'AUTH-015' // Acción sobre uno mismo — el admin intenta eliminarse o quitarse el rol de admin
   | 'AUTH-016' // Email no válido — formato de email incorrecto en el panel de admin
@@ -36,7 +35,6 @@ export const ERROR_MESSAGES: Record<ErrorCode, string> = {
   'AUTH-008': 'Ese nombre de usuario ya existe',
   'AUTH-009': 'El enlace de invitación no es válido o ha caducado',
   'AUTH-010': 'Ya existe una cuenta con ese email',
-  'AUTH-011': 'No se pudo enviar la invitación',
   'AUTH-014': 'El usuario no existe',
   'AUTH-015': 'No puedes eliminar tu propia cuenta ni quitarte el rol de admin',
   'AUTH-016': 'Introduce un email válido',

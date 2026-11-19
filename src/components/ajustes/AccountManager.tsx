@@ -74,6 +74,7 @@ export function AccountManager({ initialAccounts }: Props) {
     } else {
       setFormType('bank')
       setFormName('')
+      // eslint-disable-next-line react-hooks/purity
       setFormColor(COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)])
       setFormIcon(ICON_OPTIONS[0])
     }

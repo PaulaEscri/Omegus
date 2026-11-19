@@ -24,7 +24,7 @@ export default async function CategoriasPage() {
   try {
     const { data, error } = await supabase
       .from('categories')
-      .select('*')
+      .select('id, parent_id, name, transaction_type, is_cashback, is_investment, color, icon, sort_order, is_active')
       .eq('is_active', true)
       .order('transaction_type')
       .order('sort_order')
@@ -70,7 +70,6 @@ export default async function CategoriasPage() {
       <div className="px-5 pt-6 pb-8 max-w-md mx-auto">
         <CategoryManager
           initialCategories={categories}
-          userId={user.id}
         />
       </div>
     </div>

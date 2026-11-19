@@ -104,11 +104,17 @@ export async function getDashboardData(
 export async function getAccountBalances(
   supabase: SupabaseClient
 ): Promise<AccountBalanceData[]> {
-  const { data: accountsData, error: accountsError } = await supabase
-    .from('accounts')
-    .select('id, name, type, color')
-    .eq('is_active', true)
-    .order('sort_order')
+  const [accountsRes, txsRes] = await Promise.all([
+    supabase
+      .from('accounts')
+      .select('id, name, type, color')
+      .eq('is_active', true)
+      .order('sort_order'),
+    supabase
+      .from('transactions')
+      .select('type, amount, account_id, destination_account_id'),
+  ])
+  const { data: accountsData, error: accountsError } = accountsRes
 
   if (accountsError) {
     console.warn('No se pudieron cargar las cuentas:', accountsError.message)
@@ -118,9 +124,7 @@ export async function getAccountBalances(
   const accounts = (accountsData ?? []) as { id: string; name: string; type: string; color: string }[]
   if (accounts.length === 0) return []
 
-  const { data: txsData, error: txsError } = await supabase
-    .from('transactions')
-    .select('type, amount, account_id, destination_account_id')
+  const { data: txsData, error: txsError } = txsRes
 
   if (txsError) {
     console.warn('No se pudieron cargar los movimientos, saldos a 0:', txsError.message)
