@@ -18,5 +18,10 @@ Códigos que la app muestra al usuario con el formato `Error AUTH-00X: <mensaje>
 | AUTH-010 | Email ya registrado     | Ya existe una cuenta con ese email   | `inviteUser` con un email que ya existe en `profiles`. |
 | AUTH-011 | Error al invitar        | No se pudo enviar la invitación      | `inviteUserByEmail` devuelve error (límite de correos, SMTP, etc.). |
 | AUTH-013 | Demasiados intentos     | Demasiados intentos. Espera unos minutos e inténtalo de nuevo | `signInWithIdentifier` bloquea el login tras 5 intentos fallidos por usuario/email o 20 por IP en 15 minutos (tabla `auth_rate_limits`). |
+| AUTH-014 | Usuario no encontrado   | El usuario no existe                 | Panel de admin: el id a editar/eliminar no existe en `profiles`. |
+| AUTH-015 | Acción sobre uno mismo  | No puedes eliminar tu propia cuenta ni quitarte el rol de admin | Panel de admin: el admin intenta eliminarse o quitarse `is_admin` a sí mismo. |
+| AUTH-016 | Email no válido         | Introduce un email válido            | Panel de admin: el email no tiene formato válido. |
+| AUTH-017 | Error al eliminar       | No se pudo eliminar el usuario       | Panel de admin: `auth.admin.deleteUser` o la limpieza de datos asociados falla. |
+| AUTH-018 | Error al actualizar     | No se pudo actualizar el usuario     | Panel de admin: `auth.admin.updateUserById` o la actualización de `profiles` falla. |
 
 El detalle técnico de cada error se registra con `console.error` para depuración; la UI solo muestra el código y el mensaje de esta tabla.

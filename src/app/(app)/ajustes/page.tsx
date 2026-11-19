@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Settings2, Shapes, Wallet, Users, ChevronRight } from 'lucide-react'
+import { Settings2, Shapes, Wallet, Users, ShieldCheck, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { getIsAdmin } from '@/lib/auth/admin'
 import { cn } from '@/lib/utils'
@@ -51,6 +51,14 @@ export default async function AjustesPage() {
             icon: Users,
             color: 'text-blue-400',
             bg: 'bg-blue-500/15',
+          },
+          {
+            href: '/admin',
+            label: 'Panel de Admin',
+            description: 'Crear, editar y eliminar usuarios',
+            icon: ShieldCheck,
+            color: 'text-amber-400',
+            bg: 'bg-amber-500/15',
           },
         ]
       : []),

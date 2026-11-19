@@ -25,7 +25,10 @@ export function LoginForm() {
     try {
       // La resolución usuario → email, el límite de intentos y el inicio de
       // sesión ocurren en el servidor (server action). El email nunca llega aquí.
-      const result = await signInWithIdentifier({ identifier, password })
+      const result = await signInWithIdentifier({
+        identifier: identifier.trim().toLowerCase(),
+        password,
+      })
 
       if (!result.ok) {
         // AUTH-002: credenciales incorrectas · AUTH-013: demasiados intentos
