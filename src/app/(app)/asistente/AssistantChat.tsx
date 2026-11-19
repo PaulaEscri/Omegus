@@ -73,6 +73,10 @@ function useVisualViewport() {
   return vp
 }
 
+// Tiempos del cliente (el servidor corta antes: 20 s de inactividad / 55 s en total)
+const CLIENT_IDLE_MS = 30_000
+const CLIENT_TOTAL_MS = 70_000
+
 // ── Componente principal ─────────────────────────────────────
 export function AssistantChat({ configured }: { configured: boolean }) {
   const [messages, setMessages] = useState<UiMessage[]>([])
@@ -121,6 +125,25 @@ export function AssistantChat({ configured }: { configured: boolean }) {
       const ctrl = new AbortController()
       abortRef.current = ctrl
 
+      // Red de seguridad en el cliente: si el servidor no da señales de vida (ni
+      // texto ni errores) en IDLE_MS, o la respuesta supera TOTAL_MS, se corta y
+      // se avisa. Así `busy` nunca se queda activado.
+      let timedOut: 'idle' | 'total' | null = null
+      let idleTimer: ReturnType<typeof setTimeout> | undefined
+      const armIdle = () => {
+        clearTimeout(idleTimer)
+        idleTimer = setTimeout(() => {
+          timedOut = 'idle'
+          ctrl.abort()
+        }, CLIENT_IDLE_MS)
+      }
+      const totalTimer = setTimeout(() => {
+        timedOut = 'total'
+        ctrl.abort()
+      }, CLIENT_TOTAL_MS)
+      let finished = false // llegó el evento 'done' o 'error' del servidor
+      armIdle()
+
       try {
         const res = await fetch(`${BASE_PATH}/api/chat`, {
           method: 'POST',
@@ -132,7 +155,9 @@ export function AssistantChat({ configured }: { configured: boolean }) {
         if (!res.ok || !res.body) {
           const data = await res.json().catch(() => null)
           throw new Error(
-            res.status === 401 ? 'Sesión caducada. Recarga la página.' : (data?.error ?? 'No he podido responder.')
+            res.status === 401
+              ? 'Sesión caducada. Recarga la página.'
+              : (data?.error ?? `El servidor respondió con error ${res.status}. Inténtalo de nuevo.`)
           )
         }
 
@@ -146,11 +171,13 @@ export function AssistantChat({ configured }: { configured: boolean }) {
             patch(asstId, (m) => ({ ...m, cards: [...m.cards, { card: ev.card, status: 'idle' }] }))
           else if (ev.type === 'context') patch(asstId, (m) => ({ ...m, context: [...m.context, ev.text] }))
           else if (ev.type === 'error') patch(asstId, (m) => ({ ...m, error: ev.message }))
+          if (ev.type === 'done' || ev.type === 'error') finished = true
         }
 
         for (;;) {
           const { value, done } = await reader.read()
           if (done) break
+          armIdle()
           buffer += decoder.decode(value, { stream: true })
           let nl: number
           while ((nl = buffer.indexOf('\n')) >= 0) {
@@ -164,11 +191,33 @@ export function AssistantChat({ configured }: { configured: boolean }) {
             }
           }
         }
-      } catch (err) {
-        if ((err as Error)?.name !== 'AbortError') {
-          patch(asstId, (m) => ({ ...m, error: (err as Error)?.message || 'No he podido responder.' }))
+        // El stream terminó sin 'done' ni 'error': conexión cortada a mitad de respuesta
+        if (!finished) {
+          patch(asstId, (m) => ({
+            ...m,
+            error: m.error ?? 'La conexión se cortó antes de terminar la respuesta. Inténtalo de nuevo.',
+          }))
         }
+      } catch (err) {
+        const name = (err as Error)?.name
+        let message: string
+        if (name === 'AbortError') {
+          // Parada manual del usuario: sin error. Si fue un corte por tiempo, se explica.
+          message =
+            timedOut === 'idle'
+              ? `El asistente no ha dado señales de vida en ${CLIENT_IDLE_MS / 1000} s. Inténtalo de nuevo.`
+              : timedOut === 'total'
+                ? `El asistente ha tardado más de ${CLIENT_TOTAL_MS / 1000} s. Inténtalo con una pregunta más corta.`
+                : ''
+        } else if (err instanceof TypeError) {
+          message = `Sin conexión con el servidor (${err.message}). Revisa tu red e inténtalo de nuevo.`
+        } else {
+          message = (err as Error)?.message || 'No he podido responder.'
+        }
+        if (message) patch(asstId, (m) => ({ ...m, error: message }))
       } finally {
+        clearTimeout(idleTimer)
+        clearTimeout(totalTimer)
         patch(asstId, (m) => ({ ...m, streaming: false }))
         setBusy(false)
         abortRef.current = null

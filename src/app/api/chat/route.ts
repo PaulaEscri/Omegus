@@ -9,6 +9,10 @@
 //  - Las escrituras NO ocurren aquí: el modelo propone y el usuario confirma con
 //    un botón (server action confirmAiAction + token firmado).
 //  - Cuota diaria por usuario (ai_usage).
+//
+// Tiempos: cada llamada al proveedor se aborta si pasa LLM_IDLE_TIMEOUT_MS sin
+// recibir nada, y toda la petición tiene un tope de LLM_TOTAL_TIMEOUT_MS. Al fallar
+// se avisa al usuario con el motivo real (estado HTTP, modelo y mensaje del proveedor).
 
 import { z } from 'zod'
 import type {
@@ -17,7 +21,7 @@ import type {
 } from 'openai/resources/chat/completions'
 import { createClient } from '@/lib/supabase/server'
 import { getSessionUser } from '@/lib/auth/session'
-import { getLLM } from '@/lib/ai/config'
+import { getLLM, LLM_IDLE_TIMEOUT_MS, LLM_TOTAL_TIMEOUT_MS } from '@/lib/ai/config'
 import { loadCatalog, type Db } from '@/lib/ai/domain'
 import { buildSystemPrompt } from '@/lib/ai/prompt'
 import { TOOLS, runTool, serializeResult } from '@/lib/ai/tools'
@@ -42,6 +46,54 @@ const bodySchema = z.object({
 
 const json = (body: unknown, status: number) =>
   Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } })
+
+// Estados transitorios en los que merece la pena probar otro modelo / reintentar
+const isTransient = (status: number | undefined) =>
+  status === 404 || status === 408 || status === 429 || (typeof status === 'number' && status >= 500)
+
+// Quita claves/tokens que pudiera citar el proveedor y recorta el mensaje
+function sanitize(text: string): string {
+  return text
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, '[clave]')
+    .replace(/(sk|gsk|key)[-_][0-9A-Za-z_-]{16,}/gi, '[clave]')
+    .replace(/Bearer\s+\S+/gi, 'Bearer [oculto]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 220)
+}
+
+function describeError(err: unknown, model: string, timeout: 'idle' | 'total' | null): string {
+  if (timeout === 'total') {
+    return `La IA ha tardado más de ${LLM_TOTAL_TIMEOUT_MS / 1000} s en responder (modelo ${model}). Inténtalo con una pregunta más corta.`
+  }
+  const e = err as { status?: number; message?: string; name?: string; code?: string }
+  const status = e?.status
+  const raw = sanitize(e?.message ?? '')
+  const detail = raw ? ` Detalle: ${raw}` : ''
+
+  if (timeout === 'idle' || e?.name === 'APIConnectionTimeoutError') {
+    return `El proveedor de IA no ha respondido en ${LLM_IDLE_TIMEOUT_MS / 1000} s (modelo ${model}). Inténtalo de nuevo.`
+  }
+  if (status === 404) {
+    return `El modelo «${model}» no existe o ya no está disponible (404). Revisa LLM_MODEL en Cloudflare.${detail}`
+  }
+  if (status === 429) {
+    return `Cuota o límite de peticiones del proveedor de IA agotado (429, modelo ${model}). Espera un minuto o revisa la cuota de la API key.${detail}`
+  }
+  if (status === 401 || status === 403) {
+    return `El proveedor rechaza la API key (${status}). Revisa LLM_API_KEY en Cloudflare.${detail}`
+  }
+  if (status === 400) {
+    return `El proveedor ha rechazado la petición (400, modelo ${model}).${detail}`
+  }
+  if (typeof status === 'number' && status >= 500) {
+    return `El proveedor de IA está caído o sobrecargado (${status}, modelo ${model}). Inténtalo en unos segundos.${detail}`
+  }
+  if (e?.name === 'APIConnectionError' || status === undefined) {
+    return `No se pudo conectar con el proveedor de IA (revisa LLM_BASE_URL).${detail}`
+  }
+  return `Error ${status} del proveedor de IA (modelo ${model}).${detail}`
+}
 
 export async function POST(req: Request) {
   // Defensa CSRF adicional: si el navegador envía Origin, debe ser el mismo host
@@ -69,16 +121,27 @@ export async function POST(req: Request) {
   }
 
   const llm = getLLM()
-  if (!llm) return json({ error: 'El asistente no está configurado todavía' }, 503)
-
-  const db = (await createClient()) as unknown as Db
-
-  const usage = await checkAndCountUsage(db, user.id)
-  if (!usage.allowed) {
-    return json({ error: `Has alcanzado el límite diario (${usage.limit} mensajes). Vuelve mañana.` }, 429)
+  if (!llm) {
+    return json(
+      { error: 'El asistente no está configurado: faltan LLM_BASE_URL o LLM_MODEL en Cloudflare.' },
+      503
+    )
   }
 
-  const catalog = await loadCatalog(db)
+  let db: Db
+  let catalog: Awaited<ReturnType<typeof loadCatalog>>
+  try {
+    db = (await createClient()) as unknown as Db
+    // Cuota y catálogo son independientes: en paralelo
+    const [usage, cat] = await Promise.all([checkAndCountUsage(db, user.id), loadCatalog(db)])
+    if (!usage.allowed) {
+      return json({ error: `Has alcanzado el límite diario (${usage.limit} mensajes). Vuelve mañana.` }, 429)
+    }
+    catalog = cat
+  } catch (err) {
+    console.error('[ai] preparación:', err)
+    return json({ error: `No se pudieron cargar tus datos para el asistente. ${sanitize((err as Error)?.message ?? '')}` }, 500)
+  }
   const ctx = { db, userId: user.id, catalog }
 
   const messages: ChatCompletionMessageParam[] = [
@@ -93,8 +156,35 @@ export async function POST(req: Request) {
       const send = (ev: StreamEvent) => controller.enqueue(encoder.encode(JSON.stringify(ev) + '\n'))
       const contexts: string[] = []
 
-      const createStream = (model: string) =>
-        llm.client.chat.completions.create(
+      // ── Control de tiempos ────────────────────────────────
+      // `current` es el AbortController de la llamada en curso. Un temporizador de
+      // inactividad se rearma con cada dato recibido; otro, global, corta todo.
+      let current: AbortController | null = null
+      const t = { kind: null as 'idle' | 'total' | null } // objeto: TS no estrecha lo que cambian los temporizadores
+      let idleTimer: ReturnType<typeof setTimeout> | undefined
+      const abortCurrent = () => current?.abort()
+      const armIdle = () => {
+        clearTimeout(idleTimer)
+        idleTimer = setTimeout(() => {
+          t.kind = t.kind ?? 'idle'
+          abortCurrent()
+        }, LLM_IDLE_TIMEOUT_MS)
+      }
+      const totalTimer = setTimeout(() => {
+        t.kind = 'total'
+        abortCurrent()
+      }, LLM_TOTAL_TIMEOUT_MS)
+      req.signal.addEventListener('abort', abortCurrent)
+      const cleanup = () => {
+        clearTimeout(idleTimer)
+        clearTimeout(totalTimer)
+        req.signal.removeEventListener('abort', abortCurrent)
+      }
+
+      const createStream = (model: string) => {
+        current = new AbortController()
+        armIdle()
+        return llm.client.chat.completions.create(
           {
             model,
             messages,
@@ -102,37 +192,51 @@ export async function POST(req: Request) {
             tool_choice: 'auto',
             temperature: 0.3,
             stream: true,
+            ...(llm.reasoningEffort ? { reasoning_effort: llm.reasoningEffort } : {}),
           },
-          { signal: req.signal }
+          { signal: current.signal }
         )
+      }
+
+      let activeModel = llm.model
+      let produced = false // ¿se envió algún texto o tarjeta al usuario?
 
       try {
         for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-          // Si el modelo principal falla por saturación/caída (o ya no existe), prueba el de respaldo
-          const models = llm.fallbackModel ? [llm.model, llm.fallbackModel] : [llm.model]
+          // Intentos: principal → respaldo (o el mismo modelo una vez más si no hay respaldo)
+          const models = [llm.model, llm.fallbackModel ?? llm.model]
           let completion: Awaited<ReturnType<typeof createStream>> | undefined
           let lastErr: unknown
-          for (const model of models) {
+          for (let i = 0; i < models.length; i++) {
+            activeModel = models[i]
             try {
-              completion = await createStream(model)
+              completion = await createStream(activeModel)
               break
             } catch (e) {
               lastErr = e
               const st = (e as { status?: number })?.status
-              if (req.signal.aborted || !(st === 404 || st === 429 || (typeof st === 'number' && st >= 500))) throw e
-              console.error('[ai] modelo no disponible:', model, st)
+              const timedOutIdle = t.kind === 'idle'
+              if (req.signal.aborted || t.kind === 'total') throw e
+              if (!(isTransient(st) || timedOutIdle || st === undefined) || i === models.length - 1) throw e
+              console.error('[ai] intento fallido:', activeModel, st ?? (timedOutIdle ? 'idle-timeout' : 'red'))
+              t.kind = null // el temporizador de inactividad no debe contaminar el siguiente intento
             }
           }
           if (!completion) throw lastErr
 
           let text = ''
+          let finish: string | null = null
           const calls = new Map<number, { id: string; name: string; args: string }>()
 
           for await (const chunk of completion) {
-            const delta = chunk.choices[0]?.delta
+            armIdle()
+            const choice = chunk.choices[0]
+            if (choice?.finish_reason) finish = choice.finish_reason
+            const delta = choice?.delta
             if (!delta) continue
             if (delta.content) {
               text += delta.content
+              produced = true
               send({ type: 'text', delta: delta.content })
             }
             for (const tc of delta.tool_calls ?? []) {
@@ -151,8 +255,17 @@ export async function POST(req: Request) {
               calls.set(idx, cur)
             }
           }
+          clearTimeout(idleTimer) // las herramientas no cuentan como inactividad del proveedor
 
-          if (calls.size === 0) break // respuesta final
+          if (calls.size === 0) {
+            if (!produced) {
+              // Respuesta vacía: sin esto el usuario vería una burbuja en blanco
+              throw Object.assign(new Error(`respuesta vacía (finish_reason: ${finish ?? 'ninguno'})`), {
+                emptyResponse: true,
+              })
+            }
+            break // respuesta final
+          }
 
           const toolCalls = [...calls.entries()]
             .sort((a, b) => a[0] - b[0])
@@ -172,7 +285,10 @@ export async function POST(req: Request) {
               /* argumentos mal formados: runTool devolverá error de validación */
             }
             const out = await runTool(call.function.name, args, ctx)
-            if (out.card) send({ type: 'card', card: out.card })
+            if (out.card) {
+              produced = true
+              send({ type: 'card', card: out.card })
+            }
             if (out.context) contexts.push(out.context)
             messages.push({ role: 'tool', tool_call_id: call.id, content: serializeResult(out.result) })
           }
@@ -182,31 +298,27 @@ export async function POST(req: Request) {
         send({ type: 'done' })
       } catch (err: unknown) {
         if (req.signal.aborted) {
+          cleanup()
           controller.close()
           return
         }
-        const status = (err as { status?: number })?.status
+        const e = err as { status?: number; message?: string; emptyResponse?: boolean }
         // Detalle técnico solo en los logs del Worker (sin contenido del usuario)
         console.error(
           '[ai] chat error:',
-          status ?? 'sin-estado',
-          (err as Error)?.message,
+          activeModel,
+          e?.status ?? t.kind ?? 'sin-estado',
+          e?.message,
           JSON.stringify((err as { error?: unknown })?.error ?? null).slice(0, 800)
         )
         send({
           type: 'error',
-          message:
-            status === 429
-              ? 'El servicio de IA está saturado. Inténtalo en un minuto.'
-              : typeof status === 'number' && status >= 500
-                ? 'El servicio de IA está sobrecargado o caído ahora mismo. Inténtalo de nuevo en unos segundos.'
-                : status === 404
-                ? 'El modelo de IA configurado ya no está disponible. Hay que actualizar LLM_MODEL.'
-                : status === 401 || status === 403
-                ? 'La configuración del asistente no es válida.'
-                : `No he podido responder (error ${status ?? 'de conexión'} del proveedor de IA). Inténtalo de nuevo.`,
+          message: e?.emptyResponse
+            ? `El modelo «${activeModel}» no ha devuelto ninguna respuesta (${sanitize(e.message ?? '')}). Reformula la pregunta.`
+            : describeError(err, activeModel, t.kind),
         })
       }
+      cleanup()
       controller.close()
     },
   })
