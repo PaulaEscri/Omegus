@@ -88,7 +88,7 @@ export function SignupForm() {
           spellCheck={false}
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          placeholder="peufeliz"
+          placeholder="Usuario"
           required
           disabled={loading}
           className={cn(
